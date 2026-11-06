@@ -35,6 +35,25 @@ class FrameVentas(ctk.CTkFrame):
         )
         self.lbtitulo.pack(side="top", pady=(15, 10))
 
+        self.lcliente=ctk.CTkLabel(
+            self.arriba,
+            text="Cliente:",
+            font=("Arial", 12, "bold")
+        )
+        self.lcliente.place(x=20, y=25)
+        self.lclientebox=ctk.CTkEntry(self.arriba, width=150)
+        self.lclientebox.place(x=80, y=25)
+
+        self.lfolio=ctk.CTkLabel(
+            self.arriba,
+            text="No. Folio:",
+            font=("Arial", 12, "bold")
+        )
+        self.lfolio.place(x=250, y=25)
+        self.lfoliobox=ctk.CTkEntry(self.arriba, width=150)
+        self.lfoliobox.place(x=330, y=25)
+
+
         # Contenedor para las 6 columnas
         self.frame_columnas = ctk.CTkFrame(self.arriba, fg_color="transparent")
         self.frame_columnas.pack(side="top", fill="both", expand=True, padx=15, pady=(0, 15))
@@ -485,12 +504,14 @@ class FrameVentas(ctk.CTkFrame):
         self.cancelar()
         
     def busquedacodigo(self):
-        def al_elegir(codigo_seleccionado):
+        def al_elegir(codigo):
             self.blcodigobox.delete(0, 'end')
-            self.blcodigobox.insert(0, codigo_seleccionado)
-            self.enter() 
-        VentanaBusqueda(self, al_seleccionar_callback=al_elegir)
+            self.blcodigobox.insert(0, codigo)
+            self.enter()
 
+        # Abre en modo ventas (búsqueda general)
+        VentanaBusqueda(self, al_seleccionar_callback=al_elegir, modo="ventas")
+    
     def actualizar_totales_panel(self):
         subtotal = sum(p["precio_total"] for p in self.lista_productos)
         iva = subtotal * 0.16
