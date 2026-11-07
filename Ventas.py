@@ -1,7 +1,7 @@
 import customtkinter as ctk
 from tkinter import messagebox, END
 from Conexion import buscar_producto_por_codigo, revisar_stock
-from Busquda import VentanaBusqueda
+from Busquda import VentanaBusqueda, Ventanaborrarproducto
 
 class FrameVentas(ctk.CTkFrame):
     def __init__(self, parent):
@@ -592,7 +592,6 @@ class FrameVentas(ctk.CTkFrame):
                 messagebox.showwarning("Aviso", "El producto seleccionado no está en la venta actual.")
 
         # Abrir el modal de selección de productos a borrar
-        from Busquda import Ventanaborrarproducto
         Ventanaborrarproducto(self, al_seleccionar_callback=al_seleccionar)
 
     def cambiarprecio(self):  

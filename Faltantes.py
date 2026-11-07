@@ -1,6 +1,6 @@
 import customtkinter as ctk
 # Importamos ambos modales de búsqueda
-from Busquda import VentanaBusqueda, VentanaBusquedaProvedor
+from Busquda import VentanaBusqueda, VentanaBusquedaProveedor
 
 class FrameFaltantes(ctk.CTkFrame):
     def __init__(self, parent):
