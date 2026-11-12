@@ -226,7 +226,7 @@ class FrameFaltantes(ctk.CTkFrame):
             self.blprovedorbox.delete(0, 'end')
             self.blprovedorbox.insert(0, str(prov.get('id', '')))
 
-        VentanaBusquedaProvedor(self, al_seleccionar_callback=al_elegir)
+        VentanaBusquedaProveedor(self, al_seleccionar_callback=al_elegir)
 
     def busquedacodigo(self):
         """Abre el modal de productos filtrado por el proveedor activo (F2)"""
