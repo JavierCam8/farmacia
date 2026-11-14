@@ -1,136 +1,168 @@
 import customtkinter as ctk
-import tkinter as tk
-from tkinter import messagebox, END
+from tkinter import messagebox
 from Conexion import validar
-
-ctk.set_appearance_mode("Dark")
-ctk.set_default_color_theme("blue")
 
 
 class confirmacion(ctk.CTkToplevel):
-    def __init__(self):
-        super().__init__()
-        self.title("Verificacion")
-        self.geometry("150x200")
+    def __init__(self, parent, al_autorizar_callback=None):
+        super().__init__(parent)
+        self.title("Verificación")
+        self.geometry("300x260")
         self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
 
-        self.lusuario=ctk.CTkLabel(
+        self.al_autorizar_callback = al_autorizar_callback
+
+        self.lusuario = ctk.CTkLabel(
             self,
-            text="Contraseña nivel admin",
+            text="Usuario nivel admin:",
             font=("Arial", 12, "bold")
         )
-        self.lusuario.place(pady=5)
-        self.lusuariobox=ctk.CTkEntry(self, width=100)
-        self.lusuario.pack(pady=3)
+        self.lusuario.pack(pady=(20, 5))
+        self.lusuariobox = ctk.CTkEntry(self, width=200)
+        self.lusuariobox.pack(pady=3)
 
-        self.lpassword=ctk.CTkLabel(
+        self.lpassword = ctk.CTkLabel(
             self,
-            text="Contraseña nivel admin",
+            text="Contraseña nivel admin:",
             font=("Arial", 12, "bold")
         )
-        self.lpassword.place(pady=5)
-        self.passbox=ctk.CTkEntry(self, width=100)
+        self.lpassword.pack(pady=(10, 5))
+        self.passbox = ctk.CTkEntry(self, width=200, show="*")
         self.passbox.pack(pady=3)
 
-        self.btn_verificar=ctk.CTkButton(
-            self,
+        frame_btns = ctk.CTkFrame(self, fg_color="transparent")
+        frame_btns.pack(pady=20)
+
+        self.btn_verificar = ctk.CTkButton(
+            frame_btns,
             text="Verificar",
             fg_color="#33A018",
             hover_color="#136C13",
             text_color="#FFFFFF",
             width=100,
-            command= self.verificar
+            command=self.verificar
         )
-        self.btn_verificar.pack(pady=5)
+        self.btn_verificar.pack(side="left", padx=5)
 
-        self.btn_cancelar=ctk.CTkButton(
-            self,
+        self.btn_cancelar = ctk.CTkButton(
+            frame_btns,
             text="Cancelar",
             fg_color="#DB2020",
             hover_color="#8A1616",
             text_color="#FFFFFF",
             width=100,
-            command= self.cancelar
+            command=self.cancelar
         )
-        self.btn_cancelar.pack(pady=5)
+        self.btn_cancelar.pack(side="left", padx=5)
+
+        self.after(100, lambda: self.lusuariobox.focus())
 
     def verificar(self):
         usuario = self.lusuariobox.get().strip()
         password = self.passbox.get().strip()
 
-        if not usuario or password:
+        if not usuario or not password:
             messagebox.showinfo("Falta", "Falta llenar campos")
             return
-        datos=validar(usuario, password)
+
+        datos = validar(usuario, password)
 
         if datos:
-            self.destroy
-            ####
+            self.destroy()
+            if self.al_autorizar_callback:
+                self.al_autorizar_callback()
         else:
-            messagebox.showwarning("Error", "Contraseña o usuario incorrectas")
-            return
-        
+            messagebox.showwarning("Error", "Contraseña o usuario incorrectos")
+
     def cancelar(self):
-        self.destroy
+        self.destroy()
+
 
 class Cambio_precio(ctk.CTkToplevel):
-    def __init__(self):
-        super. __init__()
+    def __init__(self, parent, nombre_producto, precio_actual, al_cambiar_callback=None):
+        super().__init__(parent)
         self.title("Cambiar precio")
-        self.geometry("400x500")
+        self.geometry("360x340")
         self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
 
-        self.lnombre=ctk.CTkLabel(
+        self.al_cambiar_callback = al_cambiar_callback
+
+        self.lnombre = ctk.CTkLabel(
             self,
-            text="Nombre del producto",
+            text="Producto:",
             font=("Arial", 12, "bold")
         )
-        self.lnombre.pack(side="left", pady= 5, padx=10)
-        self.lnombrebox=ctk.CTkEntry(self, width=200)
-        self.lnombrebox.pack(side="left", pady=5, padx=10)
+        self.lnombre.pack(pady=(20, 3))
+        self.lnombrebox = ctk.CTkEntry(self, width=260)
+        self.lnombrebox.insert(0, nombre_producto)
+        self.lnombrebox.configure(state="disabled")
+        self.lnombrebox.pack(pady=3)
 
-        self.lprecio=ctk.CTkLabel(
+        self.lprecio = ctk.CTkLabel(
             self,
-            text="Precio del producto",
+            text="Precio actual:",
             font=("Arial", 12, "bold")
         )
-        self.lprecio.pack(side="left", pady=10, padx=10)
-        self.lpreciobox=ctk.CTkEntry(self, width=200)
-        self.lpreciobox.pack(side="left", pady=10, padx=10)
+        self.lprecio.pack(pady=(12, 3))
+        self.lpreciobox = ctk.CTkEntry(self, width=260)
+        self.lpreciobox.insert(0, f"{float(precio_actual):.2f}")
+        self.lpreciobox.configure(state="disabled")
+        self.lpreciobox.pack(pady=3)
 
-        self.lnuevoprecio=ctk.CTkLabel(
+        self.lnuevoprecio = ctk.CTkLabel(
             self,
-            text="Nuevo Precio",
+            text="Nuevo Precio:",
             font=("Arial", 12, "bold")
         )
-        self.lnuevoprecio.pack(side="left", pady=15, padx=10)
-        self.lnuevopreciobox=ctk.CTkEntry(self, width=200)
-        self.lnuevoprecio.pack(side="left", pady=15, padx=10)
+        self.lnuevoprecio.pack(pady=(12, 3))
+        self.lnuevopreciobox = ctk.CTkEntry(self, width=260, placeholder_text="0.00")
+        self.lnuevopreciobox.pack(pady=3)
 
-        self. btncambiar=ctk.CTkButton(
-            self,
+        frame_btns = ctk.CTkFrame(self, fg_color="transparent")
+        frame_btns.pack(pady=25)
+
+        self.btncambiar = ctk.CTkButton(
+            frame_btns,
             text="Cambiar",
             fg_color="#2E9919",
-            hover="#287E17",
+            hover_color="#287E17",
             text_color="#FFFFFF",
-            width=100,
-            command= self.cambiar
+            width=110,
+            command=self.cambiar
         )
-        self.btncambiar.pack(side="left", pady=20, padx=10)
+        self.btncambiar.pack(side="left", padx=8)
 
-        self. btncancelar=ctk.CTkButton(
-            self,
+        self.btncancelar = ctk.CTkButton(
+            frame_btns,
             text="Cancelar",
             fg_color="#D30B0B",
-            hover="#7E1717",
+            hover_color="#7E1717",
             text_color="#FFFFFF",
-            width=100,
-            command= self.cancelar
+            width=110,
+            command=self.cancelar
         )
-        self.btncancelar.pack(side="left", pady=20, padx=10)
+        self.btncancelar.pack(side="left", padx=8)
+
+        self.after(100, lambda: self.lnuevopreciobox.focus())
 
     def cambiar(self):
-        pass
+        valor = self.lnuevopreciobox.get().strip()
+        try:
+            nuevo_precio = float(valor)
+            if nuevo_precio <= 0:
+                messagebox.showerror("Error", "El precio debe ser mayor a 0.")
+                return
+        except ValueError:
+            messagebox.showerror("Error", "Ingrese un monto numérico válido.")
+            return
+
+        if self.al_cambiar_callback:
+            self.al_cambiar_callback(nuevo_precio)
+        self.destroy()
+
     def cancelar(self):
-        self.destroy
-        
+        self.destroy()

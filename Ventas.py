@@ -2,6 +2,7 @@ import customtkinter as ctk
 from tkinter import messagebox, END
 from Conexion import buscar_producto_por_codigo, revisar_stock
 from Busquda import VentanaBusqueda, Ventanaborrarproducto
+from CambiarPrecio import confirmacion, Cambio_precio
 
 class FrameVentas(ctk.CTkFrame):
     def __init__(self, parent):
@@ -594,8 +595,43 @@ class FrameVentas(ctk.CTkFrame):
         # Abrir el modal de selección de productos a borrar
         Ventanaborrarproducto(self, al_seleccionar_callback=al_seleccionar)
 
-    def cambiarprecio(self):  
-        pass
+    def cambiarprecio(self): 
+        precio_actual = self.blpreciobox.get().strip()
+        codigo = self.blcodigobox.get().strip()
+        detalles = self.bldetallesbox.get().strip()
+
+        if not precio_actual or not codigo:
+            messagebox.showwarning("Advertencia", "Primero cargue un producto con Enter antes de cambiar su precio.")
+            return
+
+        # 2. Función que recibe el nuevo precio y actualiza las cajas de Ventas
+        def aplicar_nuevo_precio(nuevo_precio):
+            try:
+                cantidad = int(self.blcantidadbox.get().strip())
+            except ValueError:
+                cantidad = 1
+
+            nuevo_total = nuevo_precio * cantidad
+
+            self.blpreciobox.delete(0, END)
+            self.blpreciobox.insert(0, f"{nuevo_precio:.2f}")
+
+            self.bltotalbox.delete(0, END)
+            self.bltotalbox.insert(0, f"{nuevo_total:.2f}")
+
+        # 1. Función que se ejecuta solo si el admin se autentica correctamente
+        def abrir_ventana_cambio():
+            Cambio_precio(
+                self,
+                nombre_producto=detalles,
+                precio_actual=precio_actual,
+                al_cambiar_callback=aplicar_nuevo_precio
+            )
+
+        # Iniciar flujo pidiendo contraseña de administrador
+        confirmacion(self, al_autorizar_callback=abrir_ventana_cambio)
+
+        
 
     def facturar(self):
         pass
