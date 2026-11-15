@@ -11,7 +11,7 @@ class FrameVentas(ctk.CTkFrame):
 
         self.lista_productos = []
         self.notas_guardadas=[]
-        self.folioactua=1
+        self.folio_actual=1
         totalprecio=0.00
 
         self.contenedor = ctk.CTkFrame(self, fg_color="transparent")
@@ -56,6 +56,7 @@ class FrameVentas(ctk.CTkFrame):
         self.lfolio.place(x=250, y=25)
         self.lfoliobox=ctk.CTkEntry(self.arriba, width=150)
         self.lfoliobox.place(x=330, y=25)
+        self.lfoliobox.insert(0, str(self.folio_actual))
 
 
         # Contenedor para las 6 columnas
@@ -643,24 +644,37 @@ class FrameVentas(ctk.CTkFrame):
         if not self.lista_productos:
             messagebox.showinfo("Informacion", "No hay nada registrado")
             return
-        def guardar_limpiar():
-            nota={
-                "cliente":self.lclientebox.get().strip(),
-                "folio":self.lfoliobox.get().strip(),
-                "productos":self.lista_productos.copy()
+        def guardar_y_generar_nueva():
+            folio_guardado = self.lfoliobox.get().strip() or str(self.folio_actual)
+            nota = {
+                "folio": folio_guardado,
+                "cliente": self.lclientebox.get().strip() or "Público General",
+                "productos": self.lista_productos.copy()
             }
-            self.notas_guardadas(nota)
+            self.notas_guardadas.append(nota)
 
             self.lista_productos.clear()
             self.lclientebox.delete(0, END)
+            self.cancelar()
+
+            self.folio_actual += 1
             self.lfoliobox.delete(0, END)
+            self.lfoliobox.insert(0, str(self.folio_actual))
             self.renderizar_tabla()
-        Notanueva(self, al_confirmar_callback=guardar_limpiar)
+
+            messagebox.showinfo("Nueva nota", f"Nota #{folio_guardado} guardada. Lista la nota #{self.folio_actual}.")
+
+        Notanueva(self, al_confirmar_callback=guardar_y_generar_nueva)
 
 
 
     def cancelarnota(self):
-        pass
+        self.blcodigobox.delete(0, END)
+        self.blcantidadbox.delete(0, END)
+        self.blpreciobox.delete(0, END)
+        self.bltotalbox.delete(0, END)
+        self.bldetallesbox.delete(0, END)
+        self.blcodigobox.focus()
 
     def buscarnota(self):
         pass
