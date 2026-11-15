@@ -3,12 +3,15 @@ from tkinter import messagebox, END
 from Conexion import buscar_producto_por_codigo, revisar_stock
 from Busquda import VentanaBusqueda, Ventanaborrarproducto
 from CambiarPrecio import confirmacion, Cambio_precio
+from Notas import Notanueva
 
 class FrameVentas(ctk.CTkFrame):
     def __init__(self, parent):
         super().__init__(parent)
 
         self.lista_productos = []
+        self.notas_guardadas=[]
+        self.folioactua=1
         totalprecio=0.00
 
         self.contenedor = ctk.CTkFrame(self, fg_color="transparent")
@@ -637,7 +640,24 @@ class FrameVentas(ctk.CTkFrame):
         pass
 
     def nuevanota(self):
-        pass
+        if not self.lista_productos:
+            messagebox.showinfo("Informacion", "No hay nada registrado")
+            return
+        def guardar_limpiar():
+            nota={
+                "cliente":self.lclientebox.get().strip(),
+                "folio":self.lfoliobox.get().strip(),
+                "productos":self.lista_productos.copy()
+            }
+            self.notas_guardadas(nota)
+
+            self.lista_productos.clear()
+            self.lclientebox.delete(0, END)
+            self.lfoliobox.delete(0, END)
+            self.renderizar_tabla()
+        Notanueva(self, al_confirmar_callback=guardar_limpiar)
+
+
 
     def cancelarnota(self):
         pass
