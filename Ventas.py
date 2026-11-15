@@ -4,7 +4,8 @@ from tkinter import messagebox, END
 from Conexion import buscar_producto_por_codigo, revisar_stock
 from Busquda import VentanaBusqueda, Ventanaborrarproducto
 from CambiarPrecio import confirmacion, Cambio_precio
-from Notas import Notanueva
+from Notas import Notanueva, guardar_nota_txt
+from Pagar import pagar
 
 class FrameVentas(ctk.CTkFrame):
     def __init__(self, parent):
@@ -48,6 +49,7 @@ class FrameVentas(ctk.CTkFrame):
         self.lcliente.place(x=20, y=25)
         self.lclientebox=ctk.CTkEntry(self.arriba, width=150)
         self.lclientebox.place(x=80, y=25)
+        self.lclientebox.configure(state="disabled")
 
         self.lfolio=ctk.CTkLabel(
             self.arriba,
@@ -58,6 +60,7 @@ class FrameVentas(ctk.CTkFrame):
         self.lfoliobox=ctk.CTkEntry(self.arriba, width=150)
         self.lfoliobox.place(x=330, y=25)
         self.lfoliobox.insert(0, str(self.folio_actual))
+        self.lfoliobox.configure(state="disabled")
 
 
         # Contenedor para las 6 columnas
@@ -140,6 +143,7 @@ class FrameVentas(ctk.CTkFrame):
         self.ltotal.pack(pady=(5, 0))
         self.ltotalbox = ctk.CTkEntry(self.total, width=120)
         self.ltotalbox.pack(pady=2)
+        self.ltotalbox.configure(state="disabled")
 
         self.lsubtotal = ctk.CTkLabel(
             self.total,
@@ -149,6 +153,7 @@ class FrameVentas(ctk.CTkFrame):
         self.lsubtotal.pack(pady=(2, 0))
         self.lsubtotalbox = ctk.CTkEntry(self.total, width=120)
         self.lsubtotalbox.pack(pady=2)
+        self.lsubtotalbox.configure(state="disabled")
 
         self.iva = ctk.CTkLabel(
             self.total,
@@ -158,6 +163,7 @@ class FrameVentas(ctk.CTkFrame):
         self.iva.pack(pady=(2, 0))
         self.ivabox = ctk.CTkEntry(self.total, width=120)
         self.ivabox.pack(pady=2)
+        self.ivabox.configure(state="disabled")
 
         self.lcantidadproductos = ctk.CTkLabel(
             self.total,
@@ -167,6 +173,7 @@ class FrameVentas(ctk.CTkFrame):
         self.lcantidadproductos.pack(pady=(2, 0))
         self.lcantidadproductosbox = ctk.CTkEntry(self.total, width=120)
         self.lcantidadproductosbox.pack(pady=(2, 5))
+        self.lcantidadproductosbox.configure(state="disabled")
 
         # ====================================================
         # 3. BLOQUE MEDIO (FORMULARIO DE CAPTURA)
@@ -197,6 +204,7 @@ class FrameVentas(ctk.CTkFrame):
         self.blprecio.pack(anchor="w")
         self.blpreciobox = ctk.CTkEntry(self.f_precio, width=120)
         self.blpreciobox.pack(pady=(2, 0))
+        self.blpreciobox.configure(state="disabled")
 
         # Campo: Total
         self.f_total = ctk.CTkFrame(self.frame_medio_inner, fg_color="transparent")
@@ -205,6 +213,7 @@ class FrameVentas(ctk.CTkFrame):
         self.bltotal.pack(anchor="w")
         self.bltotalbox = ctk.CTkEntry(self.f_total, width=120)
         self.bltotalbox.pack(pady=(2, 0))
+        self.bltotalbox.configure(state="disabled")
 
         # Campo: Detalles
         self.f_det = ctk.CTkFrame(self.frame_medio_inner, fg_color="transparent")
@@ -213,6 +222,7 @@ class FrameVentas(ctk.CTkFrame):
         self.bldetalles.pack(anchor="w")
         self.bldetallesbox = ctk.CTkEntry(self.f_det)
         self.bldetallesbox.pack(fill="x", pady=(2, 0))
+        self.bldetallesbox.configure(state="disabled")
 
         # Botones de Acción
         self.f_btns = ctk.CTkFrame(self.frame_medio_inner, fg_color="transparent")
@@ -327,6 +337,7 @@ class FrameVentas(ctk.CTkFrame):
             width=38,
             height=28,
             font=("Arial", 11, "bold"),
+            state="disabled",
             command=self.facturar
         )
         self.f4.pack(side="left", padx=(0, 4))
@@ -402,7 +413,7 @@ class FrameVentas(ctk.CTkFrame):
             width=38,
             height=28,
             font=("Arial", 11, "bold"),
-            command=self.subir
+            command=self.pagar
         )
         self.lf8.pack(side="left", padx=(0, 4))
         self.lf8 = ctk.CTkLabel(self.item_f8, text="Pagar", font=("Arial", 11, "bold"))
@@ -425,6 +436,24 @@ class FrameVentas(ctk.CTkFrame):
         self.lf9.pack(side="left", padx=(0, 4))
         self.lf9 = ctk.CTkLabel(self.item_f9, text="Descuento", font=("Arial", 11, "bold"))
         self.lf9.pack(side="left")
+
+        self.item_f10 = ctk.CTkFrame(self.frame_cmd_inner, fg_color="transparent")
+        self.item_f10.pack(side="left", padx=6)
+
+        self.lf10 = ctk.CTkButton(
+            self.item_f9,
+            text="F10",
+            fg_color="#FFFFFF",
+            hover_color="#E0E0E0",
+            text_color="#000000",
+            width=38,
+            height=28,
+            font=("Arial", 11, "bold"),
+            command=self.cliente
+        )
+        self.lf10.pack(side="left", padx=(0, 4))
+        self.lf10 = ctk.CTkLabel(self.item_f10, text="Cliente", font=("Arial", 11, "bold"))
+        self.lf10.pack(side="left")
 
         self.blcodigobox.bind("<Return>", self.enter)
         self.bind("<F1>", lambda e: self.busquedacodigo())
@@ -466,13 +495,31 @@ class FrameVentas(ctk.CTkFrame):
         total = precio * cantidad
         detalles = productos['detalles']
 
+        self.blpreciobox.configure(state="normal")
         self.blpreciobox.delete(0, END)
         self.blpreciobox.insert(0, f"{precio:.2f}")
+        self.blpreciobox.configure(state="disabled")
+
+        self.bltotalbox.configure(state="normal")
         self.bltotalbox.delete(0, END)
         self.bltotalbox.insert(0, f"{total:.2f}")
+        self.bltotalbox.configure(state="disabled")
+
+        self.bldetallesbox.configure(state="normal")
         self.bldetallesbox.delete(0, END)
         self.bldetallesbox.insert(0, f"{nombre} - {detalles}")
-        
+        self.bldetallesbox.configure(state="disabled")
+
+        self.blpreciobox.configure(state="normal")
+        self.blpreciobox.delete(0, END)
+        self.blpreciobox.insert(0, f"{precio}")
+        self.blpreciobox.configure(state="disabled")
+
+        self.bltotalbox.configure(state="normal")
+        self.bltotalbox.delete(0, END)
+        self.bltotalbox.insert(0, f"{total}")
+        self.bltotalbox.configure(state="disabled")
+
     def subir(self):
         """Agrega un producto validado a la lista en memoria y actualiza la tabla"""
         codigo = self.blcodigobox.get().strip()
@@ -540,17 +587,25 @@ class FrameVentas(ctk.CTkFrame):
         total = subtotal + iva
         cant_items = sum(p["cantidad"] for p in self.lista_productos)
 
+        self.lsubtotalbox.configure(state="normal")
         self.lsubtotalbox.delete(0, END)
         self.lsubtotalbox.insert(0, f"${subtotal:.2f}")
+        self.lsubtotalbox.configure(state="disabled")
 
+        self.ivabox.configure(state="normal")
         self.ivabox.delete(0, END)
         self.ivabox.insert(0, f"${iva:.2f}")
+        self.ivabox.configure(state="disabled")
 
+        self.ltotalbox.configure(state="normal")
         self.ltotalbox.delete(0, END)
         self.ltotalbox.insert(0, f"${total:.2f}")
+        self.ltotalbox.configure(state="disabled")
 
+        self.lcantidadproductosbox.configure(state="normal")
         self.lcantidadproductosbox.delete(0, END)
         self.lcantidadproductosbox.insert(0, str(cant_items))
+        self.lcantidadproductosbox.configure(state="disabled")
 
     def renderizar_tabla(self):
         """Limpia los widgets visuales de las columnas y los vuelve a dibujar desde self.lista_productos"""
@@ -617,12 +672,15 @@ class FrameVentas(ctk.CTkFrame):
                 cantidad = 1
 
             nuevo_total = nuevo_precio * cantidad
-
+            self.blpreciobox.configure(state="normal")
             self.blpreciobox.delete(0, END)
             self.blpreciobox.insert(0, f"{nuevo_precio:.2f}")
+            self.blpreciobox.configure(state="disabled")
 
+            self.bltotalbox.configure(state="normal")
             self.bltotalbox.delete(0, END)
             self.bltotalbox.insert(0, f"{nuevo_total:.2f}")
+            self.bltotalbox.configure(state="disabled")
 
         # 1. Función que se ejecuta solo si el admin se autentica correctamente
         def abrir_ventana_cambio():
@@ -642,6 +700,10 @@ class FrameVentas(ctk.CTkFrame):
         pass
 
     def nuevanota(self):
+        folio=self.lfoliobox.get().strip() or str(self.folio_actual),
+        cliente=self.lclientebox.get().strip() or "Público General",
+        productos=self.lista_productos.copy()
+        self.f4.configure(state="disabled")
         if not self.lista_productos:
             messagebox.showinfo("Informacion", "No hay nada registrado")
             return
@@ -658,6 +720,8 @@ class FrameVentas(ctk.CTkFrame):
             self.lclientebox.delete(0, END)
             self.cancelar()
 
+            guardar_nota_txt(folio, cliente, productos)
+
             self.folio_actual += 1
             self.lfoliobox.delete(0, END)
             self.lfoliobox.insert(0, str(self.folio_actual))
@@ -666,25 +730,32 @@ class FrameVentas(ctk.CTkFrame):
             messagebox.showinfo("Nueva nota", f"Nota #{folio_guardado} guardada. Lista la nota #{self.folio_actual}.")
 
         Notanueva(self, al_confirmar_callback=guardar_y_generar_nueva)
+    def pagar(self):
+        if self.lista_productos==[]:
+            messagebox.showwarning("Advertencia", "No hay productos registrados")
+            return
+        def pagar_registro():
+            self.f4(state="normal")
+        pagar(self, callback=pagar_registro)
 
-        carpeta_destino= "Notas"
-        nombre_archivo = f"Nota_{folio}.pdf"
-        os.makedirs(carpeta_destino, exist_ok=True)
-        
-        rutas_de_archivo=os.path.join(carpeta_destino,nombre_archivo)
             
-        pdf.output(rutas_de_archivo)
-        os.startfile(rutas_de_archivo)
-
-
 
     def cancelarnota(self):
         self.blcodigobox.delete(0, END)
         self.blcantidadbox.delete(0, END)
+        self.blpreciobox.configure(state="normal")
         self.blpreciobox.delete(0, END)
+        self.blpreciobox.configure(state="disabled")
+        self.bltotalbox.configure(state="normal")
         self.bltotalbox.delete(0, END)
+        self.bltotalbox.configure(state="disabled")
+        self.bldetallesbox.configure(state="normal")
         self.bldetallesbox.delete(0, END)
+        self.bldetallesbox.configure(state="disabled")
         self.blcodigobox.focus()
 
     def buscarnota(self):
+        pass
+
+    def cliente(self):
         pass
