@@ -1,4 +1,5 @@
 import customtkinter as ctk
+import os
 from tkinter import messagebox, END
 from Conexion import buscar_producto_por_codigo, revisar_stock
 from Busquda import VentanaBusqueda, Ventanaborrarproducto
@@ -665,6 +666,15 @@ class FrameVentas(ctk.CTkFrame):
             messagebox.showinfo("Nueva nota", f"Nota #{folio_guardado} guardada. Lista la nota #{self.folio_actual}.")
 
         Notanueva(self, al_confirmar_callback=guardar_y_generar_nueva)
+
+        carpeta_destino= "Notas"
+        nombre_archivo = f"Nota_{folio}.pdf"
+        os.makedirs(carpeta_destino, exist_ok=True)
+        
+        rutas_de_archivo=os.path.join(carpeta_destino,nombre_archivo)
+            
+        pdf.output(rutas_de_archivo)
+        os.startfile(rutas_de_archivo)
 
 
 
