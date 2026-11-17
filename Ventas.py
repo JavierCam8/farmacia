@@ -6,6 +6,7 @@ from Busquda import VentanaBusqueda, Ventanaborrarproducto, BuscarCliente
 from CambiarPrecio import confirmacion, Cambio_precio
 from Notas import Notanueva, guardar_nota_txt, Buscarnota, Cancelarnota
 from Pagar import pagar
+from Facturar import generar_factura_pdf
 
 class FrameVentas(ctk.CTkFrame):
     def __init__(self, parent):
@@ -440,8 +441,20 @@ class FrameVentas(ctk.CTkFrame):
 
         
 
+        # Atajos en cajas de captura
         self.blcodigobox.bind("<Return>", self.enter)
+        self.blcantidadbox.bind("<Return>", self.enter)
+
+        # Teclas de función (F1 - F9)
         self.bind("<F1>", lambda e: self.busquedacodigo())
+        self.bind("<F2>", lambda e: self.borrarproducto())
+        self.bind("<F3>", lambda e: self.cambiarprecio())
+        self.bind("<F4>", lambda e: self.cliente())
+        self.bind("<F5>", lambda e: self.nuevanota())
+        self.bind("<F6>", lambda e: self.cancelarnota())
+        self.bind("<F7>", lambda e: self.buscarnota())
+        self.bind("<F8>", lambda e: self.pagar())
+        self.bind("<F9>", lambda e: self.facturar() if self.f9.cget("state") == "normal" else None)
 
     def cancelar(self):
         self.blcodigobox.delete(0, END)
@@ -681,7 +694,47 @@ class FrameVentas(ctk.CTkFrame):
         
 
     def facturar(self):
-        pass
+        """Genera la factura en PDF y elimina la nota de memoria y de la carpeta Notas (Tecla F9)"""
+        if not self.lista_productos:
+            messagebox.showwarning("Advertencia", "No hay productos para facturar.")
+            return
+
+        folio_facturado = self.lfoliobox.get().strip() or str(self.folio_actual)
+        nombre_cliente = self.lclientebox.get().strip() or "publico general"
+        datos_cliente = getattr(self, "cliente_seleccionado", {"nombre": nombre_cliente})
+
+        # 1. Generar el documento PDF de la factura
+        generar_factura_pdf(folio_facturado, datos_cliente, self.lista_productos)
+
+        # 2. Eliminar la nota de la variable en memoria (self.notas_guardadas)
+        self.notas_guardadas = [
+            n for n in self.notas_guardadas if str(n["folio"]) != str(folio_facturado)
+        ]
+
+        # 3. Eliminar el archivo .txt de la carpeta "Notas" si estaba guardado
+        ruta_txt = os.path.join("Notas", f"Nota_{folio_facturado}.txt")
+        if os.path.exists(ruta_txt):
+            os.remove(ruta_txt)
+
+        # 4. Limpiar la pantalla y preparar el siguiente folio
+        self.lista_productos.clear()
+        self.cancelar()
+        self.f9.configure(state="disabled")
+
+        # Volver al cliente base "publico general"
+        self.restaurar_cliente_general()
+
+        # Avanzar el folio consecutivo si se facturó la nota nueva en turno
+        if folio_facturado == str(self.folio_actual):
+            self.folio_actual += 1
+
+        self.lfoliobox.configure(state="normal")
+        self.lfoliobox.delete(0, END)
+        self.lfoliobox.insert(0, str(self.folio_actual))
+        self.lfoliobox.configure(state="disabled")
+
+        self.renderizar_tabla()
+        messagebox.showinfo("Facturado", f"Factura #{folio_facturado} generada y eliminada de notas pendientes.")
 
     def nuevanota(self):
         if not self.lista_productos:
@@ -727,7 +780,8 @@ class FrameVentas(ctk.CTkFrame):
             messagebox.showwarning("Advertencia", "No hay productos registrados")
             return
         def pagar_registro():
-            self.f9(state="normal")
+            self.f9.configure(state="normal")
+            messagebox.showinfo("Pago", "Pago registrado. Ya puede facturar con F9.")
         pagar(self, callback=pagar_registro)
 
     def buscarnota(self):
@@ -736,7 +790,29 @@ class FrameVentas(ctk.CTkFrame):
             messagebox.showinfo("Informacion", "No hay notas Guardadas")
             return
         def al_elegir_folio(folio):
-            print(f"Folio seleccionado: {folio}")
+            for nota in self.notas_guardadas:
+                if str(nota["folio"]) == str(folio):
+                    self.lista_productos = nota["productos"].copy()
+
+                    # Restaurar folio en pantalla
+                    self.lfoliobox.configure(state="normal")
+                    self.lfoliobox.delete(0, END)
+                    self.lfoliobox.insert(0, str(nota["folio"]))
+                    self.lfoliobox.configure(state="disabled")
+
+                    # Restaurar cliente en pantalla
+                    self.lclientebox.configure(state="normal")
+                    self.lclientebox.delete(0, END)
+                    self.lclientebox.insert(0, nota["cliente"])
+                    self.lclientebox.configure(state="disabled")
+
+                    if "cliente_datos" in nota:
+                        self.cliente_seleccionado = nota["cliente_datos"].copy()
+
+                    self.f9.configure(state="disabled")
+                    self.cancelar()
+                    self.renderizar_tabla()
+                    break
         Buscarnota(self, lista_folios=folios, seleccionarcallback=al_elegir_folio)
 
     def cancelarnota(self):
