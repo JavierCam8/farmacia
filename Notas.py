@@ -64,7 +64,7 @@ class Buscarnota(ctk.CTkToplevel):
 
         self.lbuscar=ctk.CTkLabel(
             self,
-            text="Seleccione el numero de folio:"
+            text="Seleccione el numero de folio:",
             font=("Arial", 14, "bold")
         )
         self.lbuscar.pack(pady=(15, 8))
@@ -88,29 +88,91 @@ class Buscarnota(ctk.CTkToplevel):
             command=self.cargar
         )
         self.btncargar.pack(pady=(15, 5))
+
+        self.btncancelar=ctk.CTkButton(
+            self,
+            text="Cancelar",
+            fg_color="#EF4444",
+            hover_color="#6B1818",
+            text_color="#000000",
+            width=200,
+            command=self.cancelar
+        )
+        self.btncancelar.pack(pady=(5, 15))
     def cargar(self):
         folio_elegido=self.combofolio.get()
         self.destroy()
         if self.seleccionarcallback and folio_elegido:
             self.seleccionarcallback(folio_elegido)
+    def cancelar(self):
+        self.destroy()
 
 class Cancelarnota(ctk.CTkToplevel):
-    def __init__(self, parent):
+    def __init__(self, parent, lista_folios, al_confirmar_callback=None):
         super().__init__(parent)
         self.title("Cancelar nota")
-        self.geometry("400x500")
+        self.geometry("300x200")
         self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
 
-        self.buscarnota=ctk.CTkLabel(
-            self,
-            text="Seleccione la nota para cancelar",
-            font=("Arial", 12, "bold")
-        )
-        self.buscarnota.pack(pady=5)
-        self.combonotas=ctk.CTkComboBox(
-            self,
+        self.al_confirmar_callback = al_confirmar_callback
 
+        self.lbuscar = ctk.CTkLabel(
+            self,
+            text="Seleccione el folio a cancelar:",
+            font=("Arial", 14, "bold")
         )
+        self.lbuscar.pack(pady=(15, 8))
+
+        self.combofolio = ctk.CTkComboBox(
+            self,
+            values=lista_folios,
+            width=200,
+            state="readonly"
+        )
+        self.combofolio.pack(pady=5)
+        if lista_folios:
+            self.combofolio.set(lista_folios[0])
+
+        self.aceptar = ctk.CTkButton(
+            self,
+            text="Borrar Nota",
+            fg_color="#21B719",
+            hover_color="#1C7E17",
+            text_color="#FFFFFF",
+            width=200,
+            command=self.borrar
+        )
+        self.aceptar.pack(pady=(15, 5))
+
+        self.btncancelar = ctk.CTkButton(
+            self,
+            text="Cerrar",
+            fg_color="#EF4444",
+            hover_color="#6B1818",
+            text_color="#FFFFFF",
+            width=200,
+            command=self.cancelar
+        )
+        self.btncancelar.pack(pady=(5, 15))
+
+    def cancelar(self):
+        self.destroy()
+
+    def borrar(self):
+        folio_elegido = self.combofolio.get()
+        if not folio_elegido:
+            return
+
+        carpeta = "Notas"
+        ruta_archivo = os.path.join(carpeta, f"Nota_{folio_elegido}.txt")
+        if os.path.exists(ruta_archivo):
+            os.remove(ruta_archivo)
+
+        self.destroy()
+        if self.al_confirmar_callback:
+            self.al_confirmar_callback(folio_elegido)
 
 
 def guardar_nota_txt(folio, cliente, lista_productos):

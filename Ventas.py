@@ -4,7 +4,7 @@ from tkinter import messagebox, END
 from Conexion import buscar_producto_por_codigo, revisar_stock
 from Busquda import VentanaBusqueda, Ventanaborrarproducto
 from CambiarPrecio import confirmacion, Cambio_precio
-from Notas import Notanueva, guardar_nota_txt, Buscarnota
+from Notas import Notanueva, guardar_nota_txt, Buscarnota, Cancelarnota
 from Pagar import pagar
 
 class FrameVentas(ctk.CTkFrame):
@@ -421,27 +421,9 @@ class FrameVentas(ctk.CTkFrame):
         self.item_f9 = ctk.CTkFrame(self.frame_cmd_inner, fg_color="transparent")
         self.item_f9.pack(side="left", padx=6)
 
-        self.lf9 = ctk.CTkButton(
+        self.f9 = ctk.CTkButton(
             self.item_f9,
             text="F9",
-            fg_color="#FFFFFF",
-            hover_color="#E0E0E0",
-            text_color="#000000",
-            width=38,
-            height=28,
-            font=("Arial", 11, "bold"),
-            command=self.subir
-        )
-        self.lf9.pack(side="left", padx=(0, 4))
-        self.lf9 = ctk.CTkLabel(self.item_f9, text="Descuento", font=("Arial", 11, "bold"))
-        self.lf9.pack(side="left")
-
-        self.item_f10 = ctk.CTkFrame(self.frame_cmd_inner, fg_color="transparent")
-        self.item_f10.pack(side="left", padx=6)
-
-        self.f10 = ctk.CTkButton(
-            self.item_f10,
-            text="F10",
             fg_color="#FFFFFF",
             hover_color="#E0E0E0",
             text_color="#000000",
@@ -451,9 +433,9 @@ class FrameVentas(ctk.CTkFrame):
             state="disabled",
             command=self.facturar
         )
-        self.f10.pack(side="left", padx=(0, 4))
-        self.lf10 = ctk.CTkLabel(self.item_f10, text="Facturar", font=("Arial", 11, "bold"))
-        self.lf10.pack(side="left")
+        self.f9.pack(side="left", padx=(0, 4))
+        self.lf9 = ctk.CTkLabel(self.item_f9, text="Facturar", font=("Arial", 11, "bold"))
+        self.lf9.pack(side="left")
 
         
 
@@ -461,7 +443,18 @@ class FrameVentas(ctk.CTkFrame):
         self.bind("<F1>", lambda e: self.busquedacodigo())
 
     def cancelar(self):
-        pass
+        self.blcodigobox.delete(0, END)
+        self.blcantidadbox.delete(0, END)
+        self.blpreciobox.configure(state="normal")
+        self.blpreciobox.delete(0, END)
+        self.blpreciobox.configure(state="disabled")
+        self.bltotalbox.configure(state="normal")
+        self.bltotalbox.delete(0, END)
+        self.bltotalbox.configure(state="disabled")
+        self.bldetallesbox.configure(state="normal")
+        self.bldetallesbox.delete(0, END)
+        self.bldetallesbox.configure(state="disabled")
+        self.blcodigobox.focus()
 
     def enter(self, event=None):
         codigo = self.blcodigobox.get().strip()
@@ -512,16 +505,6 @@ class FrameVentas(ctk.CTkFrame):
         self.bldetallesbox.insert(0, f"{nombre} - {detalles}")
         self.bldetallesbox.configure(state="disabled")
 
-        self.blpreciobox.configure(state="normal")
-        self.blpreciobox.delete(0, END)
-        self.blpreciobox.insert(0, f"{precio}")
-        self.blpreciobox.configure(state="disabled")
-
-        self.bltotalbox.configure(state="normal")
-        self.bltotalbox.delete(0, END)
-        self.bltotalbox.insert(0, f"{total}")
-        self.bltotalbox.configure(state="disabled")
-
     def subir(self):
         """Agrega un producto validado a la lista en memoria y actualiza la tabla"""
         codigo = self.blcodigobox.get().strip()
@@ -552,27 +535,6 @@ class FrameVentas(ctk.CTkFrame):
         # Redibujar la tabla limpia y actualizar montos
         self.renderizar_tabla()
         self.cancelar()
-
-    def renderizar_tabla(self):
-        """Limpia los widgets visuales de las columnas y los vuelve a dibujar desde self.lista_productos"""
-        columnas = [self.codigoframe, self.cantidadframe, self.detallesframe, self.preciounitario, self.preciototal]
-        
-        # 1. Eliminar etiquetas anteriores (respetando el título del encabezado de la fila 0)
-        for frame in columnas:
-            widgets = frame.winfo_children()
-            for w in widgets[1:]:  # Omite el primer widget que es el título del encabezado
-                w.destroy()
-
-        # 2. Dibujar de nuevo cada producto del carrito
-        for p in self.lista_productos:
-            ctk.CTkLabel(self.codigoframe, text=p["codigo"], font=("Arial", 12)).pack(pady=2)
-            ctk.CTkLabel(self.cantidadframe, text=str(p["cantidad"]), font=("Arial", 12)).pack(pady=2)
-            ctk.CTkLabel(self.detallesframe, text=p["detalles"], font=("Arial", 12)).pack(pady=2)
-            ctk.CTkLabel(self.preciounitario, text=f"${p['precio_unitario']:.2f}", font=("Arial", 12)).pack(pady=2)
-            ctk.CTkLabel(self.preciototal, text=f"${p['precio_total']:.2f}", font=("Arial", 12)).pack(pady=2)
-
-        # 3. Recalcular Subtotal, IVA y Total generales
-        self.actualizar_totales_panel()
         
     def busquedacodigo(self):
         def al_elegir(codigo):
@@ -631,7 +593,7 @@ class FrameVentas(ctk.CTkFrame):
         self.actualizar_totales_panel()
 
     def borrarproducto(self):
-        """Elimina un producto del carrito actual (Tecla F2)"""
+        """Elimina un producto del carrito actual y sincroniza memoria/archivo si la nota ya estaba guardada (Tecla F2)"""
         if not self.lista_productos:
             messagebox.showwarning("Advertencia", "No hay productos en la lista actual.")
             return
@@ -650,6 +612,25 @@ class FrameVentas(ctk.CTkFrame):
             
             if encontrado:
                 self.renderizar_tabla()
+
+                # 1. Si se borraron todos los productos, bloquear de nuevo Facturar (F10)
+                if not self.lista_productos:
+                    self.f10.configure(state="disabled")
+
+                # 2. Actualizar la copia en memoria (self.notas_guardadas) si el folio ya existía
+                folio_actual_caja = self.lfoliobox.get().strip()
+                cliente_actual = self.lclientebox.get().strip() or "Público General"
+
+                for nota in self.notas_guardadas:
+                    if str(nota["folio"]) == folio_actual_caja:
+                        nota["productos"] = self.lista_productos.copy()
+                        break
+
+                # 3. Sobrescribir el archivo .txt en disco si esa nota ya estaba guardada
+                ruta_txt = os.path.join("Notas", f"Nota_{folio_actual_caja}.txt")
+                if os.path.exists(ruta_txt):
+                    guardar_nota_txt(folio_actual_caja, cliente_actual, self.lista_productos)
+
                 messagebox.showinfo("Éxito", f"Producto {codigo_a_borrar} eliminado de la nota.")
             else:
                 messagebox.showwarning("Aviso", "El producto seleccionado no está en la venta actual.")
@@ -740,22 +721,6 @@ class FrameVentas(ctk.CTkFrame):
             self.f4(state="normal")
         pagar(self, callback=pagar_registro)
 
-            
-
-    def cancelarnota(self):
-        self.blcodigobox.delete(0, END)
-        self.blcantidadbox.delete(0, END)
-        self.blpreciobox.configure(state="normal")
-        self.blpreciobox.delete(0, END)
-        self.blpreciobox.configure(state="disabled")
-        self.bltotalbox.configure(state="normal")
-        self.bltotalbox.delete(0, END)
-        self.bltotalbox.configure(state="disabled")
-        self.bldetallesbox.configure(state="normal")
-        self.bldetallesbox.delete(0, END)
-        self.bldetallesbox.configure(state="disabled")
-        self.blcodigobox.focus()
-
     def buscarnota(self):
         folios=[str(n["folio"]) for n in self.notas_guardadas]
         if not folios:
@@ -764,6 +729,40 @@ class FrameVentas(ctk.CTkFrame):
         def al_elegir_folio(folio):
             print(f"Folio seleccionado: {folio}")
         Buscarnota(self, lista_folios=folios, seleccionarcallback=al_elegir_folio)
+
+    def cancelarnota(self):
+        """Busca una nota guardada por folio y la elimina (Tecla F6)"""
+        folios = [str(n["folio"]) for n in self.notas_guardadas]
+        if not folios:
+            messagebox.showinfo("Información", "No hay notas guardadas para cancelar.")
+            return
+
+        def al_borrar_folio(folio_borrado):
+            self.notas_guardadas = [
+                n for n in self.notas_guardadas if str(n["folio"]) != str(folio_borrado)
+            ]
+
+            if self.lfoliobox.get().strip() == str(folio_borrado):
+                self.lista_productos.clear()
+                self.cancelar()
+                self.f10.configure(state="disabled")
+
+                self.lclientebox.configure(state="normal")
+                self.lclientebox.delete(0, END)
+                self.lclientebox.configure(state="disabled")
+
+                self.lfoliobox.configure(state="normal")
+                self.lfoliobox.delete(0, END)
+                self.lfoliobox.insert(0, str(self.folio_actual))
+                self.lfoliobox.configure(state="disabled")
+
+                self.renderizar_tabla()
+
+            messagebox.showinfo("Cancelada", f"La nota #{folio_borrado} fue eliminada correctamente.")
+
+        Cancelarnota(self, lista_folios=folios, al_confirmar_callback=al_borrar_folio)
+
+        
 
     def cliente(self):
         pass
