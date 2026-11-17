@@ -164,6 +164,56 @@ def guardarproducto(marca, nombre, codigobarras, codigo, descripcion, precio_cos
         if conexion and conexion.is_connected():
             conexion.close()
 
+def cambiarstock(codigo, cantidad):
+    if not codigo or cantidad is None:
+        return False, "Rellene los campos"
+
+    conexion = None
+    cursor = None
+
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+
+        # 1. Consultar el stock actual buscando por código o código de barras
+        sql_verificar = """
+            SELECT stock
+            FROM productos
+            WHERE codigo = %s OR codigobarras = %s
+            LIMIT 1
+        """
+        cursor.execute(sql_verificar, (codigo, codigo))
+        producto = cursor.fetchone()
+
+        if not producto:
+            return False, f"Producto '{codigo}' no encontrado"
+
+        stock_actual = producto["stock"] or 0
+        nuevo_stock = stock_actual + int(cantidad)
+
+        if nuevo_stock < 0:
+            return False, f"Stock insuficiente (disponible: {stock_actual})"
+
+        # 2. Actualizar el registro existente en la base de datos
+        sql_update = """
+            UPDATE productos
+            SET stock = %s
+            WHERE codigo = %s OR codigobarras = %s
+        """
+        cursor.execute(sql_update, (nuevo_stock, codigo, codigo))
+        conexion.commit()
+
+        return True, f"Stock actualizado a {nuevo_stock}"
+
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+        return False, f"Error de conexión con la base de datos: {str(e)}"
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
 ######################## CLIENTES ########################
 
 def guardarcliente(nombre, telefono, rfc, email, direccion, estado, username):

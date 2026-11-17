@@ -2,12 +2,14 @@ import customtkinter as ctk
 import os
 from tkinter import messagebox, END
 
-from Conexion import buscar_producto_por_codigo, revisar_stock
+from Conexion import buscar_producto_por_codigo, cambiarstock
 from Busquda import VentanaBusqueda, Ventanaborrarproducto
 
 class FrameEntrada(ctk.CTkFrame):
     def __init__(self, parent):
         super().__init__(parent)
+
+        self.lista_productos = []
 
         self.contenedor = ctk.CTkFrame(self, fg_color="transparent")
         self.contenedor.pack(fill="both", expand=True, padx=15, pady=10)
@@ -211,65 +213,13 @@ class FrameEntrada(ctk.CTkFrame):
         self.lf3 = ctk.CTkLabel(self.item_f3, text="Subir al sistema", font=("Arial", 12, "bold"))
         self.lf3.pack(side="left")
 
+        self.blcodigobox.bind("<Return>", self.enter)
+        self.blcantidadbox.bind("<Return>", self.enter)
 
-
-    def subir(self):
-        """Agrega un producto validado a la lista en memoria y actualiza la tabla"""
-        codigo = self.blcodigobox.get().strip()
-        detalles = self.bldetallesbox.get().strip()
-
-        try:
-            cantidad = int(self.blcantidadbox.get().strip())
-        except ValueError:
-            cantidad = 1
-
-        if not codigo or not precio_str:
-            messagebox.showwarning("Advertencia", "Primero presione Enter para cargar los datos del producto.")
-            return
-
-        precio_unitario = float(precio_str)
-        precio_total_linea = precio_unitario * cantidad
-
-        # Agregar el elemento al carrito en RAM
-        self.lista_productos.append({
-            "codigo": codigo,
-            "cantidad": cantidad,
-            "detalles": detalles,
-            "precio_unitario": precio_unitario,
-            "precio_total": precio_total_linea
-        })
-
-        # Redibujar la tabla limpia y actualizar montos
-        self.renderizar_tabla()
-        self.cancelar()
-
-    def renderizar_tabla(self):
-        """Limpia los widgets visuales de las columnas y los vuelve a dibujar desde self.lista_productos"""
-        columnas = [self.codigoframe, self.cantidadframe, self.detallesframe, self.preciounitario, self.preciototal]
-        
-        # 1. Eliminar etiquetas anteriores (respetando el título del encabezado de la fila 0)
-        for frame in columnas:
-            widgets = frame.winfo_children()
-            for w in widgets[1:]:  # Omite el primer widget que es el título del encabezado
-                w.destroy()
-
-        # 2. Dibujar de nuevo cada producto del carrito
-        for p in self.lista_productos:
-            ctk.CTkLabel(self.codigoframe, text=p["codigo"], font=("Arial", 12)).pack(pady=2)
-            ctk.CTkLabel(self.cantidadframe, text=str(p["cantidad"]), font=("Arial", 12)).pack(pady=2)
-            ctk.CTkLabel(self.detallesframe, text=p["detalles"], font=("Arial", 12)).pack(pady=2)
-            ctk.CTkLabel(self.preciounitario, text=f"${p['precio_unitario']:.2f}", font=("Arial", 12)).pack(pady=2)
-            ctk.CTkLabel(self.preciototal, text=f"${p['precio_total']:.2f}", font=("Arial", 12)).pack(pady=2)
-
-        # 3. Recalcular Subtotal, IVA y Total generales
-        self.actualizar_totales_panel()
-
-    def cancelar(self):
-        self.blcodigobox.delete(0, END)
-        self.blcantidadbox.delete(0, END)
-        self.bldetallesbox.configure(state="normal")
-        self.bldetallesbox.insert(0, END)
-        self.bldetallesbox.configure(state="disabled")
+        root = self.winfo_toplevel()
+        root.bind("<F1>", lambda e: self.busquedacodigo() if self.winfo_ismapped() else None, add="+")
+        root.bind("<F2>", lambda e: self.borrarproducto() if self.winfo_ismapped() else None, add="+")
+        root.bind("<F3>", lambda e: self.subirsistema() if self.winfo_ismapped() else None, add="+")
 
     def enter(self, event=None):
         codigo = self.blcodigobox.get().strip()
@@ -279,10 +229,9 @@ class FrameEntrada(ctk.CTkFrame):
 
         try:
             cantidad = int(self.blcantidadbox.get().strip())
-            if cantidad <=0:
-                messagebox.showerror("Error", "No se premiten cantidades negativas")
+            if cantidad <= 0:
+                messagebox.showerror("Error", "No se permiten cantidades negativas.")
                 return
-            
         except ValueError:
             cantidad = 1
             self.blcantidadbox.delete(0, END)
@@ -290,9 +239,9 @@ class FrameEntrada(ctk.CTkFrame):
 
         productos = buscar_producto_por_codigo(codigo)
         if not productos:
-            messagebox.showerror("Error", "Producto no encontrado")
+            messagebox.showerror("Error", "Producto no encontrado.")
             return
-        
+
         nombre = productos['nombre']
         detalles = productos['detalles']
 
@@ -307,55 +256,108 @@ class FrameEntrada(ctk.CTkFrame):
             self.blcodigobox.insert(0, codigo)
             self.enter()
 
-        # Abre en modo ventas (búsqueda general)
         VentanaBusqueda(self, al_seleccionar_callback=al_elegir, modo="ventas")
-    
+
+    def subir(self):
+        """Agrega un producto validado a la lista de entrada en memoria y actualiza la tabla"""
+        codigo = self.blcodigobox.get().strip()
+        detalles = self.bldetallesbox.get().strip()
+
+        try:
+            cantidad = int(self.blcantidadbox.get().strip())
+            if cantidad <= 0:
+                messagebox.showerror("Error", "La cantidad debe ser mayor a 0.")
+                return
+        except ValueError:
+            cantidad = 1
+
+        if not codigo or not detalles:
+            messagebox.showwarning("Advertencia", "Primero presione Enter para cargar los datos del producto.")
+            return
+
+        # Si el producto ya estaba en la lista de entrada, suma la cantidad en lugar de duplicar fila
+        for item in self.lista_productos:
+            if item["codigo"] == codigo:
+                item["cantidad"] += cantidad
+                self.renderizar_tabla()
+                self.cancelar()
+                return
+
+        self.lista_productos.append({
+            "codigo": codigo,
+            "cantidad": cantidad,
+            "detalles": detalles
+        })
+
+        self.renderizar_tabla()
+        self.cancelar()
+
+    def renderizar_tabla(self):
+        """Limpia los widgets visuales de las 3 columnas y los vuelve a dibujar desde self.lista_productos"""
+        columnas = [self.codigoframe, self.cantidadframe, self.detallesframe]
+
+        for frame in columnas:
+            widgets = frame.winfo_children()
+            for w in widgets[1:]:
+                w.destroy()
+
+        for p in self.lista_productos:
+            ctk.CTkLabel(self.codigoframe, text=p["codigo"], font=("Arial", 12)).pack(pady=2)
+            ctk.CTkLabel(self.cantidadframe, text=str(p["cantidad"]), font=("Arial", 12)).pack(pady=2)
+            ctk.CTkLabel(self.detallesframe, text=p["detalles"], font=("Arial", 12)).pack(pady=2)
+
+    def cancelar(self):
+        """Limpia las cajas de captura del bloque medio"""
+        self.blcodigobox.delete(0, END)
+        self.blcantidadbox.delete(0, END)
+
+        self.bldetallesbox.configure(state="normal")
+        self.bldetallesbox.delete(0, END)
+        self.bldetallesbox.configure(state="disabled")
+
+        self.blcodigobox.focus()
 
     def borrarproducto(self):
-        """Elimina un producto del carrito actual y sincroniza memoria/archivo si la nota ya estaba guardada (Tecla F2)"""
+        """Elimina un producto de la lista de entrada actual (Tecla F2)"""
         if not self.lista_productos:
             messagebox.showwarning("Advertencia", "No hay productos en la lista actual.")
             return
 
         def al_seleccionar(datos_producto):
-            # Obtener el código enviado por el modal
             codigo_a_borrar = datos_producto if isinstance(datos_producto, str) else datos_producto.get('codigobarras', '')
-            
-            # Buscar y eliminar la primera coincidencia en el carrito
+
             encontrado = False
             for i, item in enumerate(self.lista_productos):
                 if item["codigo"] == codigo_a_borrar:
                     self.lista_productos.pop(i)
                     encontrado = True
                     break
-            
+
             if encontrado:
                 self.renderizar_tabla()
-
-                # 1. Si se borraron todos los productos, bloquear de nuevo Facturar (F10)
-                if not self.lista_productos:
-                    self.f9.configure(state="disabled")
-
-                # 2. Actualizar la copia en memoria (self.notas_guardadas) si el folio ya existía
-                folio_actual_caja = self.lfoliobox.get().strip()
-                cliente_actual = self.lclientebox.get().strip() or "Público General"
-
-                for nota in self.notas_guardadas:
-                    if str(nota["folio"]) == folio_actual_caja:
-                        nota["productos"] = self.lista_productos.copy()
-                        break
-
-                # 3. Sobrescribir el archivo .txt en disco si esa nota ya estaba guardada
-                ruta_txt = os.path.join("Notas", f"Nota_{folio_actual_caja}.txt")
-                if os.path.exists(ruta_txt):
-                    guardar_nota_txt(folio_actual_caja, cliente_actual, self.lista_productos)
-
-                messagebox.showinfo("Éxito", f"Producto {codigo_a_borrar} eliminado de la nota.")
+                messagebox.showinfo("Éxito", f"Producto {codigo_a_borrar} eliminado de la entrada.")
             else:
-                messagebox.showwarning("Aviso", "El producto seleccionado no está en la venta actual.")
+                messagebox.showwarning("Aviso", "El producto seleccionado no está en la lista actual.")
 
-        # Abrir el modal de selección de productos a borrar
         Ventanaborrarproducto(self, al_seleccionar_callback=al_seleccionar)
 
     def subirsistema(self):
-        pass
+        """Suma al inventario en MySQL todos los productos de la lista (Tecla F3)"""
+        if not self.lista_productos:
+            messagebox.showwarning("Advertencia", "No hay productos en la lista para subir.")
+            return
+
+        errores = []
+        for p in self.lista_productos:
+            exito, mensaje = cambiarstock(p["codigo"], p["cantidad"])
+            if not exito:
+                errores.append(f"{p['codigo']}: {mensaje}")
+
+        if errores:
+            messagebox.showerror("Error al actualizar", "\n".join(errores))
+            return
+
+        self.lista_productos.clear()
+        self.renderizar_tabla()
+        self.cancelar()
+        messagebox.showinfo("Éxito", "Inventario actualizado correctamente en el sistema.")
