@@ -4,7 +4,7 @@ from tkinter import messagebox, END
 from Conexion import buscar_producto_por_codigo, revisar_stock
 from Busquda import VentanaBusqueda, Ventanaborrarproducto
 from CambiarPrecio import confirmacion, Cambio_precio
-from Notas import Notanueva, guardar_nota_txt
+from Notas import Notanueva, guardar_nota_txt, Buscarnota
 from Pagar import pagar
 
 class FrameVentas(ctk.CTkFrame):
@@ -324,11 +324,10 @@ class FrameVentas(ctk.CTkFrame):
         self.lf3 = ctk.CTkLabel(self.item_f3, text="Cambiar precio", font=("Arial", 11, "bold"))
         self.lf3.pack(side="left")
 
-        # --- F4 ---
         self.item_f4 = ctk.CTkFrame(self.frame_cmd_inner, fg_color="transparent")
         self.item_f4.pack(side="left", padx=6)
 
-        self.f4 = ctk.CTkButton(
+        self.lf4 = ctk.CTkButton(
             self.item_f4,
             text="F4",
             fg_color="#FFFFFF",
@@ -337,12 +336,12 @@ class FrameVentas(ctk.CTkFrame):
             width=38,
             height=28,
             font=("Arial", 11, "bold"),
-            state="disabled",
-            command=self.facturar
+            command=self.cliente
         )
-        self.f4.pack(side="left", padx=(0, 4))
-        self.lf4 = ctk.CTkLabel(self.item_f4, text="Facturar", font=("Arial", 11, "bold"))
+        self.lf4.pack(side="left", padx=(0, 4))
+        self.lf4 = ctk.CTkLabel(self.item_f4, text="Cliente", font=("Arial", 11, "bold"))
         self.lf4.pack(side="left")
+        
 
         # --- F5 ---
         self.item_f5 = ctk.CTkFrame(self.frame_cmd_inner, fg_color="transparent")
@@ -440,8 +439,8 @@ class FrameVentas(ctk.CTkFrame):
         self.item_f10 = ctk.CTkFrame(self.frame_cmd_inner, fg_color="transparent")
         self.item_f10.pack(side="left", padx=6)
 
-        self.lf10 = ctk.CTkButton(
-            self.item_f9,
+        self.f10 = ctk.CTkButton(
+            self.item_f10,
             text="F10",
             fg_color="#FFFFFF",
             hover_color="#E0E0E0",
@@ -449,11 +448,14 @@ class FrameVentas(ctk.CTkFrame):
             width=38,
             height=28,
             font=("Arial", 11, "bold"),
-            command=self.cliente
+            state="disabled",
+            command=self.facturar
         )
-        self.lf10.pack(side="left", padx=(0, 4))
-        self.lf10 = ctk.CTkLabel(self.item_f10, text="Cliente", font=("Arial", 11, "bold"))
+        self.f10.pack(side="left", padx=(0, 4))
+        self.lf10 = ctk.CTkLabel(self.item_f10, text="Facturar", font=("Arial", 11, "bold"))
         self.lf10.pack(side="left")
+
+        
 
         self.blcodigobox.bind("<Return>", self.enter)
         self.bind("<F1>", lambda e: self.busquedacodigo())
@@ -755,7 +757,13 @@ class FrameVentas(ctk.CTkFrame):
         self.blcodigobox.focus()
 
     def buscarnota(self):
-        pass
+        folios=[str(n["folio"]) for n in self.notas_guardadas]
+        if not folios:
+            messagebox.showinfo("Informacion", "No hay notas Guardadas")
+            return
+        def al_elegir_folio(folio):
+            print(f"Folio seleccionado: {folio}")
+        Buscarnota(self, lista_folios=folios, seleccionarcallback=al_elegir_folio)
 
     def cliente(self):
         pass
