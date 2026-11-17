@@ -200,7 +200,7 @@ class FrameProvedor(ctk.CTkFrame):
             font=("Arial", 12, "bold")
         )
         self.requisito.pack(pady=2)
-        self.requisitobox=ctk.CTkComboBox(self.productos, width=300, values=["Receta", "Identificación", "Ninguno"])
+        self.requisitobox=ctk.CTkComboBox(self.productos, width=300, values=["Receta", "Identificación","Ninguno"])
         self.requisitobox.pack(pady=2)
 
         self.categoria=ctk.CTkLabel(

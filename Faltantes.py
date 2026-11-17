@@ -1,10 +1,13 @@
 import customtkinter as ctk
-# Importamos ambos modales de búsqueda
+from tkinter import messagebox, END
 from Busquda import VentanaBusqueda, VentanaBusquedaProveedor
+from Conexion import buscar_producto_por_codigo
 
 class FrameFaltantes(ctk.CTkFrame):
     def __init__(self, parent):
         super().__init__(parent)
+
+        lista_productos=[]
 
         self.contenedor = ctk.CTkFrame(self, fg_color="transparent")
         self.contenedor.pack(fill="both", expand=True, padx=15, pady=10)
@@ -42,7 +45,7 @@ class FrameFaltantes(ctk.CTkFrame):
         self.frame_columnas.grid_rowconfigure(0, weight=1)
 
         # SECCIÓN 1: CÓDIGO
-        self.codigoframe = ctk.CTkFrame(self.frame_columnas, fg_color="#2B2B2B", corner_radius=8)
+        self.codigoframe = ctk.CTkScrollableFrame(self.frame_columnas, fg_color="#2B2B2B", corner_radius=8)
         self.codigoframe.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 
         self.lcodigo = ctk.CTkLabel(
@@ -53,7 +56,7 @@ class FrameFaltantes(ctk.CTkFrame):
         self.lcodigo.pack(pady=10)
 
         # SECCIÓN 2: CANTIDAD
-        self.cantidadframe = ctk.CTkFrame(self.frame_columnas, fg_color="#2B2B2B", corner_radius=8)
+        self.cantidadframe = ctk.CTkScrollableFrame(self.frame_columnas, fg_color="#2B2B2B", corner_radius=8)
         self.cantidadframe.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
 
         self.lcantidad = ctk.CTkLabel(
@@ -64,7 +67,7 @@ class FrameFaltantes(ctk.CTkFrame):
         self.lcantidad.pack(pady=10)
 
         # SECCIÓN 3: DETALLES
-        self.detallesframe = ctk.CTkFrame(self.frame_columnas, fg_color="#2B2B2B", corner_radius=8)
+        self.detallesframe = ctk.CTkScrollableFrame(self.frame_columnas, fg_color="#2B2B2B", corner_radius=8)
         self.detallesframe.grid(row=0, column=2, sticky="nsew", padx=5, pady=5)
 
         self.ldetalles = ctk.CTkLabel(
@@ -111,6 +114,7 @@ class FrameFaltantes(ctk.CTkFrame):
         self.bldetalles.pack(anchor="w")
         self.bldetallesbox = ctk.CTkEntry(self.f_det)
         self.bldetallesbox.pack(fill="x", pady=(2, 0))
+        self.bldetallesbox.configure(state="disabled")
 
         # Botones de Acción
         self.f_btns = ctk.CTkFrame(self.frame_medio_inner, fg_color="transparent")
@@ -216,6 +220,25 @@ class FrameFaltantes(ctk.CTkFrame):
         self.lf3 = ctk.CTkLabel(self.item_f3, text="Cancelar Producto", font=("Arial", 12, "bold"))
         self.lf3.pack(side="left")
 
+        self.item_f4 = ctk.CTkFrame(self.frame_cmd_inner, fg_color="transparent")
+        self.item_f4.pack(side="left", padx=30)
+
+        self.f4 = ctk.CTkButton(
+            self.item_f4,
+            text="F4",
+            fg_color="#FFFFFF",
+            hover_color="#E0E0E0",
+            text_color="#000000",
+            width=45,
+            height=28,
+            font=("Arial", 12, "bold"),
+            command=self.borrarproducto
+        )
+        self.f4.pack(side="left", padx=(0, 8))
+
+        self.lf4 = ctk.CTkLabel(self.item_f4, text="Subir al sistema", font=("Arial", 12, "bold"))
+        self.lf4.pack(side="left")
+
     # ====================================================
     # LÓGICA DE EVENTOS Y ACCIONES
     # ====================================================
@@ -248,7 +271,9 @@ class FrameFaltantes(ctk.CTkFrame):
         self.blprovedorbox.delete(0, 'end')
         self.blcodigobox.delete(0, 'end')
         self.blcantidadbox.delete(0, 'end')
+        self.bldetallesbox.configure(state="normal")
         self.bldetallesbox.delete(0, 'end')
+        self.bldetallesbox.configure(state="disabled")
 
     def borrarproducto(self):
         """Limpia solo la casilla de producto y cantidad (F3)"""
@@ -256,8 +281,83 @@ class FrameFaltantes(ctk.CTkFrame):
         self.blcantidadbox.delete(0, 'end')
         self.bldetallesbox.delete(0, 'end')
 
-    def subir(self):
-        pass
+    def renderizar_tabla(self):
+            """Limpia los widgets visuales de las 3 columnas y los vuelve a dibujar desde self.lista_productos"""
+            columnas = [self.codigoframe, self.cantidadframe, self.detallesframe]
+    
+            for frame in columnas:
+                widgets = frame.winfo_children()
+                for w in widgets[1:]:
+                    w.destroy()
+    
+            for p in self.lista_productos:
+                ctk.CTkLabel(self.codigoframe, text=p["codigo"], font=("Arial", 12)).pack(pady=2)
+                ctk.CTkLabel(self.cantidadframe, text=str(p["cantidad"]), font=("Arial", 12)).pack(pady=2)
+                ctk.CTkLabel(self.detallesframe, text=p["detalles"], font=("Arial", 12)).pack(pady=2)
+    
 
-    def enter(self):
+    def subir(self):
+        """Agrega un producto validado a la lista de entrada en memoria y actualiza la tabla"""
+        codigo = self.blcodigobox.get().strip()
+        detalles = self.bldetallesbox.get().strip()
+
+        try:
+            cantidad = int(self.blcantidadbox.get().strip())
+            if cantidad <= 0:
+                messagebox.showerror("Error", "La cantidad debe ser mayor a 0.")
+                return
+        except ValueError:
+            cantidad = 1
+
+        if not codigo or not detalles:
+            messagebox.showwarning("Advertencia", "Primero presione Enter para cargar los datos del producto.")
+            return
+
+        # Si el producto ya estaba en la lista de entrada, suma la cantidad en lugar de duplicar fila
+        for item in self.lista_productos:
+            if item["codigo"] == codigo:
+                item["cantidad"] += cantidad
+                self.renderizar_tabla()
+                self.cancelar()
+                return
+
+        self.lista_productos.append({
+            "codigo": codigo,
+            "cantidad": cantidad,
+            "detalles": detalles
+        })
+
+        self.renderizar_tabla()
+        self.cancelar()
+
+    def enter(self, event=None):
+            codigo = self.blcodigobox.get().strip()
+    
+            if not codigo:
+                return
+    
+            try:
+                cantidad = int(self.blcantidadbox.get().strip())
+                if cantidad <= 0:
+                    messagebox.showerror("Error", "No se permiten cantidades negativas.")
+                    return
+            except ValueError:
+                cantidad = 1
+                self.blcantidadbox.delete(0, END)
+                self.blcantidadbox.insert(0, str(cantidad))
+    
+            productos = buscar_producto_por_codigo(codigo)
+            if not productos:
+                messagebox.showerror("Error", "Producto no encontrado.")
+                return
+    
+            nombre = productos['nombre']
+            detalles = productos['detalles']
+    
+            self.bldetallesbox.configure(state="normal")
+            self.bldetallesbox.delete(0, END)
+            self.bldetallesbox.insert(0, f"{nombre} - {detalles}")
+            self.bldetallesbox.configure(state="disabled")
+    
+    def subirsistema(self):
         pass
