@@ -319,3 +319,25 @@ def buscar_clientes_coincidentes(criterio):
     finally:
         cursor.close()
         conexion.close()
+
+def obtener_cliente_por_id(id_cliente=1):
+    conexion = obtener_conexion()  # Usa el nombre de tu función de conexión en Conexion.py
+    if not conexion:
+        return None
+
+    try:
+        cursor = conexion.cursor(dictionary=True)
+        consulta = """
+            SELECT id, nombre, codigo, telefono, rfc, estado, direccion, email
+            FROM clientes
+            WHERE id = %s
+            LIMIT 1
+        """
+        cursor.execute(consulta, (id_cliente,))
+        return cursor.fetchone()
+    except Exception as e:
+        print(f"Error al obtener cliente por defecto: {e}")
+        return None
+    finally:
+        cursor.close()
+        conexion.close()

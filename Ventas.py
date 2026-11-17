@@ -1,8 +1,8 @@
 import customtkinter as ctk
 import os
 from tkinter import messagebox, END
-from Conexion import buscar_producto_por_codigo, revisar_stock
-from Busquda import VentanaBusqueda, Ventanaborrarproducto
+from Conexion import buscar_producto_por_codigo, revisar_stock, obtener_cliente_por_id
+from Busquda import VentanaBusqueda, Ventanaborrarproducto, BuscarCliente
 from CambiarPrecio import confirmacion, Cambio_precio
 from Notas import Notanueva, guardar_nota_txt, Buscarnota, Cancelarnota
 from Pagar import pagar
@@ -49,6 +49,7 @@ class FrameVentas(ctk.CTkFrame):
         self.lcliente.place(x=20, y=25)
         self.lclientebox=ctk.CTkEntry(self.arriba, width=150)
         self.lclientebox.place(x=80, y=25)
+        self.restaurar_cliente_general()
         self.lclientebox.configure(state="disabled")
 
         self.lfolio=ctk.CTkLabel(
@@ -615,7 +616,7 @@ class FrameVentas(ctk.CTkFrame):
 
                 # 1. Si se borraron todos los productos, bloquear de nuevo Facturar (F10)
                 if not self.lista_productos:
-                    self.f10.configure(state="disabled")
+                    self.f9.configure(state="disabled")
 
                 # 2. Actualizar la copia en memoria (self.notas_guardadas) si el folio ya existía
                 folio_actual_caja = self.lfoliobox.get().strip()
@@ -683,42 +684,50 @@ class FrameVentas(ctk.CTkFrame):
         pass
 
     def nuevanota(self):
-        folio=self.lfoliobox.get().strip() or str(self.folio_actual),
-        cliente=self.lclientebox.get().strip() or "Público General",
-        productos=self.lista_productos.copy()
-        self.f4.configure(state="disabled")
         if not self.lista_productos:
-            messagebox.showinfo("Informacion", "No hay nada registrado")
+            messagebox.showinfo("Información", "No hay nada registrado")
             return
+
         def guardar_y_generar_nueva():
             folio_guardado = self.lfoliobox.get().strip() or str(self.folio_actual)
+            cliente_guardado = self.lclientebox.get().strip() or "publico general"
+            productos_guardados = self.lista_productos.copy()
+
             nota = {
                 "folio": folio_guardado,
-                "cliente": self.lclientebox.get().strip() or "Público General",
-                "productos": self.lista_productos.copy()
+                "cliente": cliente_guardado,
+                "cliente_datos": self.cliente_seleccionado.copy(),
+                "productos": productos_guardados
             }
             self.notas_guardadas.append(nota)
+            guardar_nota_txt(folio_guardado, cliente_guardado, productos_guardados)
 
+            # 1. Limpiar carrito, captura y bloquear Facturar (F9)
             self.lista_productos.clear()
-            self.lclientebox.delete(0, END)
             self.cancelar()
+            self.f9.configure(state="disabled")
 
-            guardar_nota_txt(folio, cliente, productos)
+            # 2. Volver a poner "publico general" (id=1) como cliente activo
+            self.restaurar_cliente_general()
 
+            # 3. Avanzar al siguiente folio desbloqueando la caja temporalmente
             self.folio_actual += 1
+            self.lfoliobox.configure(state="normal")
             self.lfoliobox.delete(0, END)
             self.lfoliobox.insert(0, str(self.folio_actual))
-            self.renderizar_tabla()
+            self.lfoliobox.configure(state="disabled")
 
+            self.renderizar_tabla()
             messagebox.showinfo("Nueva nota", f"Nota #{folio_guardado} guardada. Lista la nota #{self.folio_actual}.")
 
         Notanueva(self, al_confirmar_callback=guardar_y_generar_nueva)
+
     def pagar(self):
         if self.lista_productos==[]:
             messagebox.showwarning("Advertencia", "No hay productos registrados")
             return
         def pagar_registro():
-            self.f4(state="normal")
+            self.f9(state="normal")
         pagar(self, callback=pagar_registro)
 
     def buscarnota(self):
@@ -745,11 +754,10 @@ class FrameVentas(ctk.CTkFrame):
             if self.lfoliobox.get().strip() == str(folio_borrado):
                 self.lista_productos.clear()
                 self.cancelar()
-                self.f10.configure(state="disabled")
+                self.f9.configure(state="disabled")
 
-                self.lclientebox.configure(state="normal")
-                self.lclientebox.delete(0, END)
-                self.lclientebox.configure(state="disabled")
+                # Volver a poner "publico general" (id=1)
+                self.restaurar_cliente_general()
 
                 self.lfoliobox.configure(state="normal")
                 self.lfoliobox.delete(0, END)
@@ -762,7 +770,28 @@ class FrameVentas(ctk.CTkFrame):
 
         Cancelarnota(self, lista_folios=folios, al_confirmar_callback=al_borrar_folio)
 
-        
+    def restaurar_cliente_general(self):
+        """Carga desde la BD el cliente base (id=1: publico general) y lo muestra en pantalla"""
+        cliente_base = obtener_cliente_por_id(1)
+        if not cliente_base:
+            cliente_base = {"id": 1, "nombre": "publico general"}
+
+        self.cliente_seleccionado = cliente_base
+
+        self.lclientebox.configure(state="normal")
+        self.lclientebox.delete(0, END)
+        self.lclientebox.insert(0, cliente_base["nombre"])
+        self.lclientebox.configure(state="disabled")
 
     def cliente(self):
-        pass
+        """Abre el buscador de clientes y asigna el elegido a la nota (Tecla F4)"""
+        def al_elegir_cliente(datos_cliente):
+            nombre_cliente = datos_cliente.get("nombre", "Público General")
+            self.cliente_seleccionado = datos_cliente  # Útil después para Facturar (F10)
+
+            self.lclientebox.configure(state="normal")
+            self.lclientebox.delete(0, "end")
+            self.lclientebox.insert(0, nombre_cliente)
+            self.lclientebox.configure(state="disabled")
+
+        BuscarCliente(self, al_seleccionar_callback=al_elegir_cliente)
