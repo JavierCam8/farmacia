@@ -295,3 +295,27 @@ def buscar_proveedores_coincidentes(criterio):
     except Exception as e:
         messagebox.showerror("Error", f"No se encontró el proveedor: {e}")
         return []
+
+def buscar_clientes_coincidentes(criterio):
+    conexion = obtener_conexion()  # Usa el nombre de tu función de conexión en Conexion.py
+    if not conexion:
+        return []
+
+    try:
+        cursor = conexion.cursor(dictionary=True)
+        # Ajusta 'clientes', 'id' o 'nombre' si en tu tabla se llaman distinto (ej. id_cliente)
+        consulta = """
+            SELECT id, nombre
+            FROM clientes
+            WHERE nombre LIKE %s OR CAST(id AS CHAR) LIKE %s
+            LIMIT 50
+        """
+        patron = f"%{criterio}%"
+        cursor.execute(consulta, (patron, patron))
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"Error al buscar clientes: {e}")
+        return []
+    finally:
+        cursor.close()
+        conexion.close()
