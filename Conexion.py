@@ -391,3 +391,34 @@ def obtener_cliente_por_id(id_cliente=1):
     finally:
         cursor.close()
         conexion.close()
+
+########################################## promociones
+
+def guardarpromocion(nombre, fproducto, fcantidad, dproducto, dcantidad, tproducto, tcantidad, precio):
+    if not all([nombre, fproducto, fcantidad, dproducto, dcantidad, tproducto, tcantidad, precio]):
+        messagebox.showerror("Error", "Rellene los campos")
+        return
+    conexion=None
+    cursor=None
+
+    try:
+        conexion=obtener_conexion()
+        cursor=conexion.cursor(dictionary=True)
+        sql_verificar="SELECT id FROM promocion WHERE nombre = %s"
+        cursor.execute(sql_verificar, (nombre,))
+        if cursor.fetchone():
+            return False, "La promo ya ha sido registrada"
+        sql_insert= """
+        INSERT INTO promocion(nombre, fproducto, fcantidad, dproducto, dcantidad, tproducto, tcantidad, precio)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"""
+        valores=(nombre, fproducto, fcantidad, dproducto, dcantidad, tproducto, tcantidad, precio)
+        cursor.execute(sql_insert, valores)
+        conexion.commit()
+        return True, "co,bo registrado con exito"
+    except Exception as e:
+        return False, f"Error de conexion con la base de datos: {str(e)}"
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
