@@ -9,7 +9,7 @@ from Conexion import (
 )
 
 
-class promociones(ctk.CTkFrame):
+class FramePromociones(ctk.CTkFrame):
     def __init__(self, parent):
         super().__init__(parent)
 
@@ -20,11 +20,11 @@ class promociones(ctk.CTkFrame):
         self.contenedor.pack(fill="both", expand=True, padx=15, pady=10)
 
         self.izquierda = ctk.CTkFrame(self.contenedor)
-        self.izquierda.pack(side="top", fill="both", expand=True, pady=(0, 10))
+        self.izquierda.pack(side="left", fill="both", expand=True, padx=(0, 10))
 
-        self.derecha = ctk.CTkFrame(self.contenedor, height=90)
-        self.derecha.pack(side="top", fill="x", pady=(10, 0))
-
+        self.derecha = ctk.CTkFrame(self.contenedor)
+        self.derecha.pack(side="right", fill="both", expand=True, padx=(10, 0))
+        
         self.nuevos = ctk.CTkLabel(
             self.izquierda,
             text="Agregar una nueva promoción",

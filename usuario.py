@@ -9,6 +9,7 @@ from Faltantes import FrameFaltantes
 from Provedores import FrameProvedor
 from Entrada import FrameEntrada
 from Clientes import FrameClientes
+from Promocion import FramePromociones
 
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
@@ -122,6 +123,15 @@ class VentanaUsuario(ctk.CTk):
                 command=lambda: self.cambiar_frame(FrameProvedor)
             )
             self.btn_admin2.pack(pady=10, padx=10)
+
+            self.btn_admin3 = ctk.CTkButton(
+                self.menu,
+                text="Promociones",
+                fg_color="#10B981",
+                hover_color="#059669",
+                command=lambda: self.cambiar_frame(FramePromociones)
+            )
+            self.btn_admin3.pack(pady=10, padx=10)
 
         if rango == "ventas":
             self.cambiar_frame(FrameVentas)
