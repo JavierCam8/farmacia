@@ -394,29 +394,111 @@ def obtener_cliente_por_id(id_cliente=1):
 
 ########################################## promociones
 
-def guardarpromocion(nombre, fproducto, fcantidad, dproducto, dcantidad, tproducto, tcantidad, precio):
-    if not all([nombre, fproducto, fcantidad, dproducto, dcantidad, tproducto, tcantidad, precio]):
-        messagebox.showerror("Error", "Rellene los campos")
-        return
-    conexion=None
-    cursor=None
+########################################## PROMOCIONES
 
+def obtener_detalle_producto(codigo):
+    """Busca un solo producto por código o código de barras y devuelve su nombre"""
+    conexion = None
+    cursor = None
     try:
-        conexion=obtener_conexion()
-        cursor=conexion.cursor(dictionary=True)
-        sql_verificar="SELECT id FROM promocion WHERE nombre = %s"
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+        sql = """
+            SELECT codigo, codigobarras, nombre, precio_venta
+            FROM productos
+            WHERE codigo = %s OR codigobarras = %s
+            LIMIT 1
+        """
+        cursor.execute(sql, (codigo, codigo))
+        return cursor.fetchone()
+    except Exception as e:
+        print(f"Error al buscar detalle de producto: {e}")
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
+
+def guardarpromocion(nombre, fproducto, fcantidad, sproducto, scantidad, tproducto, tcantidad, precio):
+    if not all([nombre, fproducto, fcantidad, precio]):
+        return False, "Complete al menos el nombre, el primer producto, su cantidad y el precio."
+
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+
+        sql_verificar = "SELECT id FROM promocion WHERE nombre = %s"
         cursor.execute(sql_verificar, (nombre,))
         if cursor.fetchone():
-            return False, "La promo ya ha sido registrada"
-        sql_insert= """
-        INSERT INTO promocion(nombre, fproducto, fcantidad, dproducto, dcantidad, tproducto, tcantidad, precio)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"""
-        valores=(nombre, fproducto, fcantidad, dproducto, dcantidad, tproducto, tcantidad, precio)
+            return False, "Ya existe una promoción registrada con ese nombre."
+
+        sql_insert = """
+            INSERT INTO promocion (nombre, fproducto, fcantidad, sproducto, scantidad, tproducto, tcantidad, precio)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        valores = (
+            nombre,
+            fproducto,
+            int(fcantidad),
+            sproducto if sproducto else None,
+            int(scantidad) if scantidad else None,
+            tproducto if tproducto else None,
+            int(tcantidad) if tcantidad else None,
+            float(precio)
+        )
         cursor.execute(sql_insert, valores)
         conexion.commit()
-        return True, "co,bo registrado con exito"
+        return True, "Promoción registrada con éxito."
+
+    except ValueError:
+        return False, "Las cantidades deben ser números enteros y el precio un número válido."
     except Exception as e:
-        return False, f"Error de conexion con la base de datos: {str(e)}"
+        if conexion:
+            conexion.rollback()
+        return False, f"Error de conexión con la base de datos: {str(e)}"
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
+
+def obtener_promociones():
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+        cursor.execute("SELECT id, nombre, activo FROM promocion ORDER BY id DESC")
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"Error al obtener promociones: {e}")
+        return []
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
+
+def cambiar_estado_promocion(promo_id, activo):
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor()
+        sql = "UPDATE promocion SET activo = %s WHERE id = %s"
+        cursor.execute(sql, (activo, promo_id))
+        conexion.commit()
+        return True, "Estado de la promoción actualizado."
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+        return False, f"Error al actualizar estado: {e}"
     finally:
         if cursor:
             cursor.close()
