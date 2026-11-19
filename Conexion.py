@@ -170,6 +170,24 @@ def obtener_proveedores():
         if conexion and conexion.is_connected():
             conexion.close()
 
+def obtener_nombre_proveedor(id_proveedor):
+    """Devuelve el nombre del proveedor a partir de su ID"""
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+        cursor.execute("SELECT nombre FROM proveedores WHERE id = %s LIMIT 1", (id_proveedor,))
+        fila = cursor.fetchone()
+        return fila["nombre"] if fila else None
+    except Exception as e:
+        print(f"Error al obtener nombre del proveedor: {e}")
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
 
 def actualizarprovedor(id_proveedor, nombre, telefono, rfc, email, direccion, estado):
     """Actualiza los datos de un proveedor existente"""

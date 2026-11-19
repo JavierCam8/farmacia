@@ -1,13 +1,15 @@
 import customtkinter as ctk
 from tkinter import messagebox, END
 from Busquda import VentanaBusqueda, VentanaBusquedaProveedor
-from Conexion import buscar_producto_por_codigo, obtener_producto_de_proveedor
+from ListaFaltantes import listafaltantes
+from Conexion import buscar_producto_por_codigo, obtener_producto_de_proveedor, obtener_nombre_proveedor
 
 class FrameFaltantes(ctk.CTkFrame):
     def __init__(self, parent):
         super().__init__(parent)
 
-        lista_productos=[]
+        self.lista_productos = []
+        self.nombre_proveedor = ""
 
         self.contenedor = ctk.CTkFrame(self, fg_color="transparent")
         self.contenedor.pack(fill="both", expand=True, padx=15, pady=10)
@@ -232,7 +234,7 @@ class FrameFaltantes(ctk.CTkFrame):
             width=45,
             height=28,
             font=("Arial", 12, "bold"),
-            command=self.borrarproducto
+            command=self.subirsistema
         )
         self.f4.pack(side="left", padx=(0, 8))
 
@@ -245,9 +247,9 @@ class FrameFaltantes(ctk.CTkFrame):
     def busquedaprovedor(self):
         """Abre el modal de búsqueda de proveedores (F1)"""
         def al_elegir(prov):
-            # Recibe el objeto proveedor y coloca su ID en la caja de texto
             self.blprovedorbox.delete(0, 'end')
             self.blprovedorbox.insert(0, str(prov.get('id', '')))
+            self.nombre_proveedor = prov.get('nombre', '')
 
         VentanaBusquedaProveedor(self, al_seleccionar_callback=al_elegir)
 
@@ -275,6 +277,7 @@ class FrameFaltantes(ctk.CTkFrame):
 
     def cancelar(self):
         """Limpia todas las cajas del formulario"""
+        self.nombre_proveedor = ""
         self.blprovedorbox.delete(0, 'end')
         self.blcodigobox.delete(0, 'end')
         self.blcantidadbox.delete(0, 'end')
@@ -375,4 +378,31 @@ class FrameFaltantes(ctk.CTkFrame):
         self.bldetallesbox.configure(state="disabled")
     
     def subirsistema(self):
-        pass
+        """Genera/actualiza el archivo .txt de faltantes del proveedor y limpia la tabla (F4)"""
+        id_prov = self.blprovedorbox.get().strip()
+        if not id_prov:
+            messagebox.showwarning("Proveedor requerido", "Seleccione un proveedor antes de subir la lista.")
+            return
+
+        if not self.lista_productos:
+            messagebox.showwarning("Lista vacía", "Agregue al menos un producto a la tabla antes de subir.")
+            return
+
+        # Obtener el nombre del proveedor (desde F1 o consultando por ID en MySQL)
+        nombre_prov = self.nombre_proveedor or obtener_nombre_proveedor(id_prov)
+        if not nombre_prov:
+            messagebox.showerror("Error", "El ID del proveedor no existe en la base de datos.")
+            return
+
+        try:
+            # Genera o acumula en Faltantes/Faltantes_<nombre_prov>.txt y lo abre
+            listafaltantes(nombre_prov, self.lista_productos)
+
+            # Limpiar tabla en memoria, vista y formulario para el siguiente pedido
+            self.lista_productos.clear()
+            self.renderizar_tabla()
+            self.cancelar()
+
+            messagebox.showinfo("Éxito", f"Lista de faltantes guardada para {nombre_prov}.")
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo generar el archivo de faltantes: {e}")
