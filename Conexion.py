@@ -717,3 +717,23 @@ def cambiar_estado_promocion(promo_id, activo):
             cursor.close()
         if conexion and conexion.is_connected():
             conexion.close()
+
+def obtener_email_proveedor(id_proveedor):
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT nombre, email FROM proveedores WHERE id = %s LIMIT 1",
+            (id_proveedor,),
+        )
+        return cursor.fetchone()
+    except Exception as e:
+        print(f"Error al obtener correo del proveedor: {e}")
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()

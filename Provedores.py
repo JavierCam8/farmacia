@@ -1,7 +1,8 @@
+import os
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import messagebox, END
-
+from enviarcorreo import enviar_correo
 from Conexion import guardarprovedor, guardarproducto, buscarprovedor, obtener_proveedores, actualizarprovedor, obtener_productos, buscarproducto_nombre, actualizarproducto
 
 class FrameProvedor(ctk.CTkFrame):
@@ -321,24 +322,25 @@ class FrameProvedor(ctk.CTkFrame):
         )
         self.pedidoscombo.pack(pady=5)
 
-        self.provedorfaltante=ctk.CTkLabel(
+        self.provedorfaltante = ctk.CTkLabel(
             self.pedidos,
             text="Proveedor designado", 
             font=("Arial", 12, "bold")
         )
         self.provedorfaltante.pack(pady=3)
-        self.provedorfaltantebox=ctk.CTkEntry(self.pedidos, width=200)
+        self.provedorfaltantebox = ctk.CTkEntry(self.pedidos, width=250)
+        self.provedorfaltantebox.pack(pady=3)
         self.provedorfaltantebox.configure(state="disabled")
 
-        self.btactualizar=ctk.CTkButton(
+        self.btactualizarlista = ctk.CTkButton(
             self.pedidos,
-            text="Actualizar",
-            fg_color="#1D69B9",
-            hover_color="#1D32A9",
+            text="Actualizar lista",
+            fg_color="#2563EB",
+            hover_color="#1D4ED8",
             text_color="#FFFFFF",
-            command=self.actualizarpedido
+            command=self.cargar_faltantes
         )
-        self.btactualizar.pack(pady=5)
+        self.btactualizarlista.pack(pady=5)
 
         self.btaenviar=ctk.CTkButton(
             self.pedidos,
@@ -352,7 +354,7 @@ class FrameProvedor(ctk.CTkFrame):
 
         self.btborrar=ctk.CTkButton(
             self.pedidos,
-            text="Actualizar",
+            text="Borrar",
             fg_color="#B91D1D",
             hover_color="#A91D1D",
             text_color="#FFFFFF",
@@ -376,7 +378,7 @@ class FrameProvedor(ctk.CTkFrame):
         self.producto_actual_id = None
         self.cargar_productos()
 
-
+        self.cargar_faltantes()
 
     def obtenerfaltantes(self):
         pass
@@ -629,11 +631,125 @@ class FrameProvedor(ctk.CTkFrame):
         self.cestadobox.delete(0, END)
         self.cestadobox.insert(0, datos["estado"] or "")
 
-    def actualizarpedido(self):
-        pass
     def enviar(self):
-        pass
+        """Obtiene el correo del proveedor desde MySQL y envía el archivo .txt adjunto"""
+        archivo = self.pedidoscombo.get().strip()
+        nombre_proveedor = self.provedorfaltantebox.get().strip()
+
+        if not archivo or not nombre_proveedor:
+            messagebox.showwarning("Sin selección", "Seleccione una lista de pedidos primero.")
+            return
+
+        ruta = os.path.join("Faltantes", archivo)
+        if not os.path.exists(ruta):
+            messagebox.showerror("Error", "El archivo de pedido ya no existe.")
+            self.cargar_faltantes()
+            return
+
+        datos_prov = buscarprovedor(nombre_proveedor)
+        if not datos_prov or not datos_prov.get("email"):
+            messagebox.showerror(
+                "Sin correo",
+                f"El proveedor '{nombre_proveedor}' no tiene un correo registrado en la base de datos."
+            )
+            return
+
+        correo_destino = datos_prov["email"]
+        confirmar = messagebox.askyesno(
+            "Confirmar envío",
+            f"¿Enviar '{archivo}' al correo:\n{correo_destino}?"
+        )
+        if not confirmar:
+            return
+
+        exito, mensaje = enviar_correo(
+            destinatario=correo_destino,
+            asunto=f"Pedido de productos faltantes - {nombre_proveedor}",
+            cuerpo=f"Estimado(a) {nombre_proveedor},\n\nAdjunto la lista de productos requeridos.\n\nSaludos.",
+            ruta_adjunto=ruta,
+        )
+
+        if exito:
+            messagebox.showinfo("Correo enviado", mensaje)
+            if messagebox.askyesno("Eliminar archivo", "¿Desea borrar el archivo .txt ya enviado?"):
+                os.remove(ruta)
+            self.cancelarpedido()
+            self.cargar_faltantes()
+        else:
+            messagebox.showerror("Error al enviar", mensaje)
     def borrar(self):
-        pass
+        """Elimina definitivamente el archivo .txt seleccionado"""
+        archivo = self.pedidoscombo.get().strip()
+        if not archivo:
+            messagebox.showwarning("Sin selección", "Seleccione un pedido de la lista para borrar.")
+            return
+
+        ruta = os.path.join("Faltantes", archivo)
+        if not messagebox.askyesno("Confirmar", f"¿Eliminar permanentemente '{archivo}'?"):
+            return
+
+        try:
+            if os.path.exists(ruta):
+                os.remove(ruta)
+            messagebox.showinfo("Eliminado", "Lista de faltantes eliminada.")
+            self.cancelarpedido()
+            self.cargar_faltantes()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo eliminar el archivo: {e}")
+            
     def cancelarpedido(self):
-        pass
+        """Limpia la selección actual sin borrar el archivo"""
+        self.pedidoscombo.set("")
+        self.limpiar_proveedor_designado()
+
+    def cargar_faltantes(self):
+        """Carga en pedidoscombo los archivos .txt de la carpeta Faltantes"""
+        carpeta = "Faltantes"
+        if not os.path.exists(carpeta):
+            self.pedidoscombo.configure(values=[""])
+            self.pedidoscombo.set("")
+            return
+
+        archivos = [f for f in os.listdir(carpeta) if f.endswith(".txt")]
+        if archivos:
+            self.pedidoscombo.configure(values=archivos)
+        else:
+            self.pedidoscombo.configure(values=[""])
+        self.pedidoscombo.set("")
+
+    def obtenerfaltantes(self, _seleccion=None):
+        """Lee el .txt elegido y muestra el proveedor designado en provedorfaltantebox"""
+        archivo = self.pedidoscombo.get().strip()
+        if not archivo:
+            self.limpiar_proveedor_designado()
+            return
+
+        ruta = os.path.join("Faltantes", archivo)
+        if not os.path.exists(ruta):
+            messagebox.showerror("Error", "El archivo seleccionado ya no existe.")
+            self.cargar_faltantes()
+            return
+
+        nombre_proveedor = ""
+        try:
+            with open(ruta, "r", encoding="utf-8") as f:
+                for linea in f:
+                    if linea.startswith("Proveedor:"):
+                        nombre_proveedor = linea.replace("Proveedor:", "").strip()
+                        break
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo leer el archivo: {e}")
+            return
+
+        if not nombre_proveedor:
+            nombre_proveedor = archivo.replace("Faltantes_", "").replace(".txt", "")
+
+        self.provedorfaltantebox.configure(state="normal")
+        self.provedorfaltantebox.delete(0, END)
+        self.provedorfaltantebox.insert(0, nombre_proveedor)
+        self.provedorfaltantebox.configure(state="disabled")
+
+    def limpiar_proveedor_designado(self):
+        self.provedorfaltantebox.configure(state="normal")
+        self.provedorfaltantebox.delete(0, END)
+        self.provedorfaltantebox.configure(state="disabled")
