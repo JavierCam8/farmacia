@@ -468,31 +468,49 @@ def obtener_producto_de_proveedor(codigo, id_proveedor):
             conexion.close()
 
 
-def buscar_producto_por_codigo(codigo, codigobarras):
+def buscar_producto_por_codigo(codigo):
+    conexion = None
+    cursor = None
     try:
         conexion = obtener_conexion()
         cursor = conexion.cursor(dictionary=True)
-        sql = "SELECT codigo, codigobarras FROM productos WHERE codigo = %s OR codigobarras = %s"
-        cursor.execute(sql, (codigo, codigobarras))
-        productos = cursor.fetchall()
-        cursor.close()
-        conexion.close()
-        return productos
+        sql = """
+            SELECT codigo, codigobarras, nombre, descripcion, precio_venta, stock
+            FROM productos
+            WHERE codigo = %s OR codigobarras = %s
+            LIMIT 1
+        """
+        cursor.execute(sql, (codigo, codigo))
+        return cursor.fetchone()
     except Exception as e:
-        return False, f"Error de conexión con la base de datos: {str(e)}"
+        print(f"Error al buscar producto: {e}")
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
 
 def revisar_stock(codigo):
+    conexion = None
+    cursor = None
     try:
         conexion = obtener_conexion()
         cursor = conexion.cursor(dictionary=True)
-        sql = "SELECT stock FROM productos WHERE codigo = %s"
-        cursor.execute(sql, (codigo,))
-        stock = cursor.fetchone()
-        cursor.close()
-        conexion.close()
-        return stock
+        sql = "SELECT stock FROM productos WHERE codigo = %s OR codigobarras = %s LIMIT 1"
+        cursor.execute(sql, (codigo, codigo))
+        fila = cursor.fetchone()
+        if fila is None:
+            return None
+        return fila["stock"] if fila["stock"] is not None else 0
     except Exception as e:
-        return False, f"Error de conexión con la base de datos: {str(e)}"
+        print(f"Error al revisar stock: {e}")
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
 
 def buscar_productos_coincidentes(criterio):
     try:

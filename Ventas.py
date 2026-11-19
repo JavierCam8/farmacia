@@ -446,15 +446,17 @@ class FrameVentas(ctk.CTkFrame):
         self.blcantidadbox.bind("<Return>", self.enter)
 
         # Teclas de función (F1 - F9)
-        self.bind("<F1>", lambda e: self.busquedacodigo())
-        self.bind("<F2>", lambda e: self.borrarproducto())
-        self.bind("<F3>", lambda e: self.cambiarprecio())
-        self.bind("<F4>", lambda e: self.cliente())
-        self.bind("<F5>", lambda e: self.nuevanota())
-        self.bind("<F6>", lambda e: self.cancelarnota())
-        self.bind("<F7>", lambda e: self.buscarnota())
-        self.bind("<F8>", lambda e: self.pagar())
-        self.bind("<F9>", lambda e: self.facturar() if self.f9.cget("state") == "normal" else None)
+       # Teclas de función (F1 - F9) en la ventana principal mientras Ventas esté visible
+        ventana = self.winfo_toplevel()
+        ventana.bind("<F1>", lambda e: self.busquedacodigo() if self.winfo_ismapped() else None, add="+")
+        ventana.bind("<F2>", lambda e: self.borrarproducto() if self.winfo_ismapped() else None, add="+")
+        ventana.bind("<F3>", lambda e: self.cambiarprecio() if self.winfo_ismapped() else None, add="+")
+        ventana.bind("<F4>", lambda e: self.cliente() if self.winfo_ismapped() else None, add="+")
+        ventana.bind("<F5>", lambda e: self.nuevanota() if self.winfo_ismapped() else None, add="+")
+        ventana.bind("<F6>", lambda e: self.cancelarnota() if self.winfo_ismapped() else None, add="+")
+        ventana.bind("<F7>", lambda e: self.buscarnota() if self.winfo_ismapped() else None, add="+")
+        ventana.bind("<F8>", lambda e: self.pagar() if self.winfo_ismapped() else None, add="+")
+        ventana.bind("<F9>", lambda e: self.facturar() if (self.winfo_ismapped() and self.f9.cget("state") == "normal") else None, add="+")
 
     def cancelar(self):
         self.blcodigobox.delete(0, END)
@@ -478,31 +480,31 @@ class FrameVentas(ctk.CTkFrame):
 
         try:
             cantidad = int(self.blcantidadbox.get().strip())
-            if cantidad <=0:
-                messagebox.showerror("Error", "No se premiten cantidades negativas")
+            if cantidad <= 0:
+                messagebox.showerror("Error", "No se permiten cantidades negativas o cero")
                 return
-            
         except ValueError:
             cantidad = 1
             self.blcantidadbox.delete(0, END)
             self.blcantidadbox.insert(0, str(cantidad))
 
-        productos = buscar_producto_por_codigo(codigo)
-        if not productos:
+        producto = buscar_producto_por_codigo(codigo)
+        if not producto:
             messagebox.showerror("Error", "Producto no encontrado")
             return
+
         infostock = revisar_stock(codigo)
-        if not infostock:
+        if infostock is None:
             messagebox.showerror("Error", "No se pudo obtener información de stock")
             return
         if cantidad > infostock:
             messagebox.showerror("Error", f"Cantidad excede el stock disponible ({infostock})")
             return
 
-        nombre = productos['nombre']
-        precio= productos['precio_venta']
+        nombre = producto["nombre"]
+        precio = float(producto.get("precio_venta") or 0)
         total = precio * cantidad
-        detalles = productos['detalles']
+        detalles = producto.get("descripcion") or ""
 
         self.blpreciobox.configure(state="normal")
         self.blpreciobox.delete(0, END)
@@ -516,9 +518,10 @@ class FrameVentas(ctk.CTkFrame):
 
         self.bldetallesbox.configure(state="normal")
         self.bldetallesbox.delete(0, END)
-        self.bldetallesbox.insert(0, f"{nombre} - {detalles}")
+        texto_detalles = f"{nombre} - {detalles}" if detalles else nombre
+        self.bldetallesbox.insert(0, texto_detalles)
         self.bldetallesbox.configure(state="disabled")
-
+        
     def subir(self):
         """Agrega un producto validado a la lista en memoria y actualiza la tabla"""
         codigo = self.blcodigobox.get().strip()

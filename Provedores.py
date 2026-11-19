@@ -222,7 +222,7 @@ class FrameProvedor(ctk.CTkFrame):
             font=("Arial", 12, "bold")
         )
         self.categoria.pack(pady=2)
-        self.categoriabox=ctk.CTkComboBox(self.productos, values=[""], width=300)
+        self.categoriabox=ctk.CTkComboBox(self.productos, values=["Limitado", "Sin limitaciones"], width=300)
         self.categoriabox.pack(pady=2)
 
         self.costo=ctk.CTkLabel(
