@@ -127,11 +127,87 @@ def guardarprovedor(nombre, telefono, rfc, email, direccion, estado):
         if conexion and conexion.is_connected():
             conexion.close()
 
+def buscarprovedor(provedor):
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+
+        sql_buscar = """SELECT id, nombre, telefono, rfc, email, direccion, estado 
+                        FROM proveedores 
+                        WHERE nombre = %s"""
+
+        cursor.execute(sql_buscar, (provedor,))
+        return cursor.fetchone()
+
+    except Exception as e:
+        print(f"Error al buscar proveedor: {e}")
+        return None
+
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
+
+def obtener_proveedores():
+    """Devuelve lista de proveedores (id y nombre) para llenar los ComboBox"""
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+        cursor.execute("SELECT id, nombre FROM proveedores ORDER BY nombre ASC")
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"Error al obtener proveedores: {e}")
+        return []
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
+
+def actualizarprovedor(id_proveedor, nombre, telefono, rfc, email, direccion, estado):
+    """Actualiza los datos de un proveedor existente"""
+    if not all([id_proveedor, nombre, telefono, rfc, email, direccion, estado]):
+        return False, "Por favor complete todos los campos."
+
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor()
+
+        sql_update = """
+            UPDATE proveedores
+            SET nombre = %s, telefono = %s, rfc = %s, email = %s, direccion = %s, estado = %s
+            WHERE id = %s
+        """
+        valores = (nombre, telefono, rfc, email, direccion, estado, id_proveedor)
+        cursor.execute(sql_update, valores)
+        conexion.commit()
+        return True, "Datos del proveedor actualizados con éxito."
+
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+        return False, f"Error al actualizar proveedor: {str(e)}"
+
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
 ######################## PRODUCTOS ########################
 
-def guardarproducto(marca, nombre, codigobarras, codigo, descripcion, precio_costo, precio_venta, idprovedor, requisito):
+def guardarproducto(marca, nombre, codigobarras, codigo, descripcion, precio_costo, precio_venta, idprovedor, requisito, categoria):
     """Registra un nuevo producto en la base de datos"""
-    if not all([marca, nombre, codigobarras, codigo, descripcion, precio_costo, precio_venta, idprovedor, requisito]):
+    if not all([marca, nombre, codigobarras, codigo, descripcion, precio_costo, precio_venta, idprovedor, requisito, categoria]):
         return False, "Por favor complete todos los campos."
 
     conexion = None
@@ -146,10 +222,10 @@ def guardarproducto(marca, nombre, codigobarras, codigo, descripcion, precio_cos
             return False, "El producto ya está registrado."
 
         sql_insert = """
-            INSERT INTO productos (marca, nombre, codigobarras, codigo, descripcion, precio_costo, precio_venta, idprovedor, requisito)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO productos (marca, nombre, codigobarras, codigo, descripcion, precio_costo, precio_venta, idprovedor, requisito, categoria)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
-        valores = (marca, nombre, codigobarras, codigo, descripcion, precio_costo, precio_venta, idprovedor, requisito)
+        valores = (marca, nombre, codigobarras, codigo, descripcion, precio_costo, precio_venta, idprovedor, requisito, categoria)
 
         cursor.execute(sql_insert, valores)
         conexion.commit()
@@ -209,6 +285,102 @@ def cambiarstock(codigo, cantidad):
         if conexion:
             conexion.rollback()
         return False, f"Error de conexión con la base de datos: {str(e)}"
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
+def obtener_productos():
+    """Devuelve lista de productos (id y nombre) para llenar el ComboBox"""
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+        cursor.execute("SELECT id, nombre FROM productos ORDER BY nombre ASC")
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"Error al obtener productos: {e}")
+        return []
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
+
+def buscarproducto_nombre(nombre):
+    """Obtiene todos los datos de un producto y el nombre de su proveedor"""
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+        sql = """
+            SELECT p.id, p.marca, p.nombre, p.codigobarras, p.codigo,
+                   p.descripcion, p.precio_costo, p.precio_venta,
+                   p.idprovedor, p.requisito, p.categoria,
+                   pr.nombre AS nombre_proveedor
+            FROM productos p
+            LEFT JOIN proveedores pr ON p.idprovedor = pr.id
+            WHERE p.nombre = %s
+            LIMIT 1
+        """
+        cursor.execute(sql, (nombre,))
+        return cursor.fetchone()
+    except Exception as e:
+        print(f"Error al buscar producto: {e}")
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
+
+def actualizarproducto(id_producto, marca, nombre, codigobarras, codigo, descripcion, precio_costo, precio_venta, idprovedor, requisito, categoria):
+    """Actualiza la información de un producto existente en la base de datos"""
+    if not all([id_producto, marca, nombre, codigobarras, codigo, descripcion, precio_costo, precio_venta, idprovedor, requisito, categoria]):
+        return False, "Por favor complete todos los campos."
+
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+
+        # Verificar que no exista otro producto con el mismo nombre
+        sql_verificar = "SELECT id FROM productos WHERE nombre = %s AND id != %s"
+        cursor.execute(sql_verificar, (nombre, id_producto))
+        if cursor.fetchone():
+            return False, "Ya existe otro producto registrado con ese nombre."
+
+        sql_update = """
+            UPDATE productos
+            SET marca = %s,
+                nombre = %s,
+                codigobarras = %s,
+                codigo = %s,
+                descripcion = %s,
+                precio_costo = %s,
+                precio_venta = %s,
+                idprovedor = %s,
+                requisito = %s,
+                categoria = %s
+            WHERE id = %s
+        """
+        valores = (marca, nombre, codigobarras, codigo, descripcion, float(precio_costo), float(precio_venta), idprovedor, requisito, categoria, id_producto,)
+        cursor.execute(sql_update, valores)
+        conexion.commit()
+        return True, "Información del producto actualizada con éxito."
+
+    except ValueError:
+        return False, "El costo y el precio de venta deben ser números válidos."
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+        return False, f"Error al actualizar producto: {str(e)}"
     finally:
         if cursor:
             cursor.close()

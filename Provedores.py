@@ -1,8 +1,8 @@
 import customtkinter as ctk
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, END
 
-from Conexion import guardarprovedor
+from Conexion import guardarprovedor, guardarproducto, buscarprovedor, obtener_proveedores, actualizarprovedor, obtener_productos, buscarproducto_nombre, actualizarproducto
 
 class FrameProvedor(ctk.CTkFrame):
     def __init__(self, parent):
@@ -98,16 +98,16 @@ class FrameProvedor(ctk.CTkFrame):
         self.cestadobox=ctk.CTkEntry(self.actualizarprovedor, width=300)
         self.cestadobox.pack(pady=2)
 
-        self.btguardar=ctk.CTkButton(
+        self.btnbuscar=ctk.CTkButton(
             self.actualizarprovedor,
-            text="Guardar",
-            fg_color="#10B981",
-            hover_color="#09650F",
-            text_color="#FFFFFE",
+            text="Buscarprovedor",
+            fg_color="#2563EB",
+            hover_color="#1D4ED8",
+            text_color="#FFFFFF",
             width=300,
-            command=self.guardarprovedor
+            command=self.buscarprovedor
         )
-        self.btguardar.pack(pady=3)
+        self.btnbuscar.pack(pady=2)
 
         self.btcambiar=ctk.CTkButton(
             self.actualizarprovedor,
@@ -119,6 +119,18 @@ class FrameProvedor(ctk.CTkFrame):
             command=self.cambiar
         )
         self.btcambiar.pack(pady=2)
+        self.btcambiar.configure(state="disabled")
+
+        self.btguardar=ctk.CTkButton(
+            self.actualizarprovedor,
+            text="Guardar",
+            fg_color="#10B981",
+            hover_color="#09650F",
+            text_color="#FFFFFE",
+            width=300,
+            command=self.guardarprovedor
+        )
+        self.btguardar.pack(pady=3)
 
         self.btcancelarcambio=ctk.CTkButton(
             self.actualizarprovedor,
@@ -146,7 +158,7 @@ class FrameProvedor(ctk.CTkFrame):
             font=("Arial", 12, "bold")
         )
         self.bproducto.pack(pady=2)
-        self.buscarproducto=ctk.CTkComboBox(self.productos, values=[""], width=300)
+        self.buscarproducto=ctk.CTkComboBox(self.productos, values=[""], width=300, command=self.buscar_producto)
         self.buscarproducto.pack(pady=2)
 
         self.nombreproducto=ctk.CTkLabel(
@@ -239,16 +251,16 @@ class FrameProvedor(ctk.CTkFrame):
         self.ventabox=ctk.CTkEntry(self.productos, width=300)
         self.ventabox.pack(pady=2)
 
-        self.btpguardar=ctk.CTkButton(
+        self.btnbuscarproducto = ctk.CTkButton(
             self.productos,
-            text="Guardar",
-            fg_color="#10B981",
-            hover_color="#059669",
+            text="Buscar producto",
+            fg_color="#2563EB",
+            hover_color="#1D4ED8",
             text_color="#FFFFFF",
             width=300,
-            command=self.guardarproducto
+            command=self.buscar_producto
         )
-        self.btpguardar.pack(pady=2)
+        self.btnbuscarproducto.pack(pady=2)
 
         self.btcambiarproducto=ctk.CTkButton(
             self.productos,
@@ -260,6 +272,18 @@ class FrameProvedor(ctk.CTkFrame):
             command=self.cambioproducto
         )
         self.btcambiarproducto.pack(pady=2)
+        self.btcambiarproducto.configure(state="disabled")
+
+        self.btpguardar=ctk.CTkButton(
+            self.productos,
+            text="Guardar",
+            fg_color="#10B981",
+            hover_color="#059669",
+            text_color="#FFFFFF",
+            width=300,
+            command=self.guardarproducto
+        )
+        self.btpguardar.pack(pady=2)
 
         self.btcancelar=ctk.CTkButton(
             self.productos,
@@ -296,38 +320,258 @@ class FrameProvedor(ctk.CTkFrame):
         )
         self.pedidoscombo.pack(pady=5)
 
-        
+        self.proveedor_actual_id = None
+        self.cargar_proveedores()
 
+        self.producto_actual_id = None
+        self.cargar_productos()
+
+    
+
+    def cargar_productos(self):
+        productos = obtener_productos()
+        nombres = [p["nombre"] for p in productos]
+
+        if nombres:
+            self.buscarproducto.configure(values=nombres)
+        else:
+            self.buscarproducto.configure(values=[""])
+        self.buscarproducto.set("")
+
+    def buscar_producto(self, _seleccion=None):
+        nombre_producto = self.buscarproducto.get().strip()
+        if not nombre_producto:
+            messagebox.showinfo("Error", "No hay ningún producto seleccionado")
+            return
+
+        datos = buscarproducto_nombre(nombre_producto)
+        if not datos:
+            messagebox.showwarning("Sin resultados", "No se encontró el producto en la base de datos")
+            return
+
+        self.producto_actual_id = datos["id"]
+        self.btcambiarproducto.configure(state="normal")
+
+        # Rellenar Entry
+        self.nombreproductobox.delete(0, END)
+        self.nombreproductobox.insert(0, datos["nombre"] or "")
+
+        self.marcabox.delete(0, END)
+        self.marcabox.insert(0, datos["marca"] or "")
+
+        self.codigobarrasbox.delete(0, END)
+        self.codigobarrasbox.insert(0, datos["codigobarras"] or "")
+
+        self.codigobox.delete(0, END)
+        self.codigobox.insert(0, datos["codigo"] or "")
+
+        self.descripcionbox.delete(0, END)
+        self.descripcionbox.insert(0, datos["descripcion"] or "")
+
+        self.costobox.delete(0, END)
+        self.costobox.insert(0, str(datos["precio_costo"]) if datos["precio_costo"] is not None else "")
+
+        self.ventabox.delete(0, END)
+        self.ventabox.insert(0, str(datos["precio_venta"]) if datos["precio_venta"] is not None else "")
+
+        # Rellenar ComboBox
+        self.requisitobox.set(datos["requisito"] or "")
+        self.categoriabox.set(datos["categoria"] or "")
+        self.provedorbox.set(datos["nombre_proveedor"] or "")
 
     def cambioproducto(self):
-        pass
-    def guardarproducto(self):
-        pass
-    def cambiar(self):
-        pass
-    def cancelarcambio(self):
-        pass
-    def guardarprovedor(self):
-        nombre=self.cnombrebox.get().strip()
-        telefono=self.ctelefonobox.get().strip()
-        rfc=self.crfcbox.get().strip()
-        email=self.cemailbox.get().strip()
-        direccion=self.cdireccionbox.get().strip()
-        estado=self.cestadobox.get().strip()
+        if not self.producto_actual_id:
+            messagebox.showerror("Error", "Primero busque un producto para modificar")
+            return
 
-        if not all[nombre, telefono, rfc, email, direccion, estado]:
+        nombre = self.nombreproductobox.get().strip()
+        marca = self.marcabox.get().strip()
+        codigobarras = self.codigobarrasbox.get().strip()
+        codigo = self.codigobox.get().strip()
+        descripcion = self.descripcionbox.get().strip()
+        requisitos = self.requisitobox.get().strip()
+        categoria = self.categoriabox.get().strip()
+        costo = self.costobox.get().strip()
+        provedor_nombre = self.provedorbox.get().strip()
+        venta = self.ventabox.get().strip()
+
+        if not all([nombre, marca, codigobarras, codigo, descripcion, requisitos, categoria, costo, provedor_nombre, venta]):
+            messagebox.showerror("Error", "Llene todos los campos")
+            return
+
+        id_provedor = self.mapa_proveedores.get(provedor_nombre)
+        if not id_provedor:
+            messagebox.showerror("Error", "Seleccione un proveedor válido de la lista")
+            return
+
+        exito, mensaje = actualizarproducto(
+            self.producto_actual_id,
+            marca,
+            nombre,
+            codigobarras,
+            codigo,
+            descripcion,
+            costo,
+            venta,
+            id_provedor,
+            requisitos,
+            categoria,
+        )
+        if exito:
+            messagebox.showinfo("Éxito", mensaje)
+            self.cancelar()
+            self.cargar_productos()
+        else:
+            messagebox.showerror("Error", mensaje)
+
+    def guardarproducto(self):
+        nombre = self.nombreproductobox.get().strip()
+        marca = self.marcabox.get().strip()
+        codigobarras = self.codigobarrasbox.get().strip()
+        codigo = self.codigobox.get().strip()
+        descripcion = self.descripcionbox.get().strip()
+        requisitos = self.requisitobox.get().strip()
+        categoria = self.categoriabox.get().strip()
+        costo = self.costobox.get().strip()
+        provedor_nombre = self.provedorbox.get().strip()
+        venta = self.ventabox.get().strip()
+
+        if not all([nombre, marca, codigobarras, codigo, descripcion, requisitos, categoria, costo, provedor_nombre, venta]):
+            messagebox.showerror("Error", "Llene todos los campos")
+            return
+
+        id_provedor = self.mapa_proveedores.get(provedor_nombre)
+        if not id_provedor:
+            messagebox.showerror("Error", "Seleccione un proveedor válido de la lista")
+            return
+
+        exito, mensaje = guardarproducto(
+            marca, nombre, codigobarras, codigo, descripcion, costo, venta, id_provedor, requisitos, categoria
+        )
+        if exito:
+            messagebox.showinfo("Éxito", mensaje)
+            self.cancelar()
+            self.cargar_productos()
+        else:
+            messagebox.showerror("Error", mensaje)
+
+    def cambiar(self):
+        if not self.proveedor_actual_id:
+            messagebox.showerror("Error", "Primero busque un proveedor para modificar")
+            return
+
+        nombre = self.cnombrebox.get().strip()
+        telefono = self.ctelefonobox.get().strip()
+        rfc = self.crfcbox.get().strip()
+        email = self.cemailbox.get().strip()
+        direccion = self.cdireccionbox.get().strip()
+        estado = self.cestadobox.get().strip()
+
+        if not all([nombre, telefono, rfc, email, direccion, estado]):
             messagebox.showerror("Error", "Datos incompletos")
             return
-        exito, mesaje=guardarprovedor(nombre, telefono, rfc, email, direccion, estado)
+
+        exito, mensaje = actualizarprovedor(
+            self.proveedor_actual_id, nombre, telefono, rfc, email, direccion, estado
+        )
         if exito:
-            messagebox.showinfo("Éxito", mesaje)
-            self.cancelar()
+            messagebox.showinfo("Éxito", mensaje)
+            self.cancelarcambio()
+            self.cargar_proveedores()
         else:
-            messagebox.showerror("Error", mesaje)
+            messagebox.showerror("Error", mensaje)
 
+    def cancelarcambio(self):
+        self.proveedor_actual_id = None
+        self.bpnombrebox.set("")
+        self.cnombrebox.delete(0, END)
+        self.ctelefonobox.delete(0, END)
+        self.crfcbox.delete(0, END)
+        self.cemailbox.delete(0, END)
+        self.cdireccionbox.delete(0, END)
+        self.cestadobox.delete(0, END)
+        self.btcambiar.configure(state="disabled")    
 
+    def guardarprovedor(self):
+        nombre = self.cnombrebox.get().strip()
+        telefono = self.ctelefonobox.get().strip()
+        rfc = self.crfcbox.get().strip()
+        email = self.cemailbox.get().strip()
+        direccion = self.cdireccionbox.get().strip()
+        estado = self.cestadobox.get().strip()
 
+        if not all([nombre, telefono, rfc, email, direccion, estado]):
+            messagebox.showerror("Error", "Datos incompletos")
+            return
 
+        exito, mensaje = guardarprovedor(nombre, telefono, rfc, email, direccion, estado)
+        if exito:
+            messagebox.showinfo("Éxito", mensaje)
+            self.cancelarcambio()
+            self.cargar_proveedores()
+        else:
+            messagebox.showerror("Error", mensaje)
 
     def cancelar(self):
-        pass
+        self.producto_actual_id = None
+        self.buscarproducto.set("")
+        self.nombreproductobox.delete(0, END)
+        self.marcabox.delete(0, END)
+        self.codigobarrasbox.delete(0, END)
+        self.codigobox.delete(0, END)
+        self.descripcionbox.delete(0, END)
+        self.requisitobox.set("")
+        self.categoriabox.set("")
+        self.costobox.delete(0, END)
+        self.provedorbox.set("")
+        self.ventabox.delete(0, END)
+        self.btcambiarproducto.configure(state="disabled")
+
+    def cargar_proveedores(self):
+        proveedores = obtener_proveedores()
+        self.mapa_proveedores = {p["nombre"]: p["id"] for p in proveedores}
+        nombres = list(self.mapa_proveedores.keys())
+
+        if nombres:
+            self.bpnombrebox.configure(values=nombres)
+            self.provedorbox.configure(values=nombres)
+        else:
+            self.bpnombrebox.configure(values=[""])
+            self.provedorbox.configure(values=[""])
+        self.bpnombrebox.set("")
+        self.provedorbox.set("")
+
+    
+
+    def buscarprovedor(self):
+        provedor = self.bpnombrebox.get().strip()
+        if not provedor:
+            messagebox.showinfo("Error", "No hay ningún proveedor seleccionado")
+            return
+
+        datos = buscarprovedor(provedor)
+
+        if not datos:
+            messagebox.showwarning("Sin resultados", "No se encontró el proveedor en la base de datos")
+            return
+
+        self.proveedor_actual_id = datos["id"]
+        self.btcambiar.configure(state="normal")
+
+        self.cnombrebox.delete(0, END)
+        self.cnombrebox.insert(0, datos["nombre"] or "")
+
+        self.ctelefonobox.delete(0, END)
+        self.ctelefonobox.insert(0, datos["telefono"] or "")
+
+        self.crfcbox.delete(0, END)
+        self.crfcbox.insert(0, datos["rfc"] or "")
+
+        self.cemailbox.delete(0, END)
+        self.cemailbox.insert(0, datos["email"] or "")
+
+        self.cdireccionbox.delete(0, END)
+        self.cdireccionbox.insert(0, datos["direccion"] or "")
+
+        self.cestadobox.delete(0, END)
+        self.cestadobox.insert(0, datos["estado"] or "")
