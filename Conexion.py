@@ -424,6 +424,31 @@ def guardarcliente(nombre, telefono, rfc, email, direccion, estado, username):
             conexion.close()
 
 ######################## VENTAS & BÚSQUEDAS ########################
+def obtener_producto_de_proveedor(codigo, id_proveedor):
+    """Verifica que el producto exista y pertenezca al proveedor activo"""
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+        sql = """
+            SELECT codigo, codigobarras, nombre, descripcion, idprovedor
+            FROM productos
+            WHERE (codigo = %s OR codigobarras = %s)
+              AND idprovedor = %s
+            LIMIT 1
+        """
+        cursor.execute(sql, (codigo, codigo, id_proveedor))
+        return cursor.fetchone()
+    except Exception as e:
+        print(f"Error al verificar producto del proveedor: {e}")
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
 
 def buscar_producto_por_codigo(codigo, codigobarras):
     try:
@@ -563,8 +588,6 @@ def obtener_cliente_por_id(id_cliente=1):
     finally:
         cursor.close()
         conexion.close()
-
-########################################## promociones
 
 ########################################## PROMOCIONES
 

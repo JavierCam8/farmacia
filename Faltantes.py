@@ -1,7 +1,7 @@
 import customtkinter as ctk
 from tkinter import messagebox, END
 from Busquda import VentanaBusqueda, VentanaBusquedaProveedor
-from Conexion import buscar_producto_por_codigo
+from Conexion import buscar_producto_por_codigo, obtener_producto_de_proveedor
 
 class FrameFaltantes(ctk.CTkFrame):
     def __init__(self, parent):
@@ -252,17 +252,24 @@ class FrameFaltantes(ctk.CTkFrame):
         VentanaBusquedaProveedor(self, al_seleccionar_callback=al_elegir)
 
     def busquedacodigo(self):
-        """Abre el modal de productos filtrado por el proveedor activo (F2)"""
+        """Verifica que haya proveedor antes de abrir el modal de productos (F2)"""
         id_prov = self.blprovedorbox.get().strip()
+        if not id_prov:
+            messagebox.showwarning(
+                "Proveedor requerido",
+                "Primero seleccione un proveedor (F1) antes de buscar productos."
+            )
+            return
 
         def al_elegir(codigo):
             self.blcodigobox.delete(0, 'end')
             self.blcodigobox.insert(0, codigo)
+            self.enter()  # Carga automáticamente los detalles al seleccionar
 
         VentanaBusqueda(
-            self, 
-            al_seleccionar_callback=al_elegir, 
-            modo="faltantes", 
+            self,
+            al_seleccionar_callback=al_elegir,
+            modo="faltantes",
             id_proveedor=id_prov
         )
 
@@ -276,11 +283,13 @@ class FrameFaltantes(ctk.CTkFrame):
         self.bldetallesbox.configure(state="disabled")
 
     def borrarproducto(self):
-        """Limpia solo la casilla de producto y cantidad (F3)"""
+        """Limpia solo la casilla de producto, cantidad y detalles (F3)"""
         self.blcodigobox.delete(0, 'end')
         self.blcantidadbox.delete(0, 'end')
+        self.bldetallesbox.configure(state="normal")
         self.bldetallesbox.delete(0, 'end')
-
+        self.bldetallesbox.configure(state="disabled")
+        
     def renderizar_tabla(self):
             """Limpia los widgets visuales de las 3 columnas y los vuelve a dibujar desde self.lista_productos"""
             columnas = [self.codigoframe, self.cantidadframe, self.detallesframe]
@@ -297,7 +306,7 @@ class FrameFaltantes(ctk.CTkFrame):
     
 
     def subir(self):
-        """Agrega un producto validado a la lista de entrada en memoria y actualiza la tabla"""
+        """Agrega un producto validado a la lista en memoria y actualiza la tabla"""
         codigo = self.blcodigobox.get().strip()
         detalles = self.bldetallesbox.get().strip()
 
@@ -313,12 +322,11 @@ class FrameFaltantes(ctk.CTkFrame):
             messagebox.showwarning("Advertencia", "Primero presione Enter para cargar los datos del producto.")
             return
 
-        # Si el producto ya estaba en la lista de entrada, suma la cantidad en lugar de duplicar fila
         for item in self.lista_productos:
             if item["codigo"] == codigo:
                 item["cantidad"] += cantidad
                 self.renderizar_tabla()
-                self.cancelar()
+                self.borrarproducto()  # Conserva el proveedor seleccionado
                 return
 
         self.lista_productos.append({
@@ -328,36 +336,43 @@ class FrameFaltantes(ctk.CTkFrame):
         })
 
         self.renderizar_tabla()
-        self.cancelar()
+        self.borrarproducto()  # Conserva el proveedor seleccionado
 
     def enter(self, event=None):
-            codigo = self.blcodigobox.get().strip()
-    
-            if not codigo:
+        id_prov = self.blprovedorbox.get().strip()
+        if not id_prov:
+            messagebox.showwarning("Proveedor requerido", "Primero seleccione un proveedor.")
+            return
+
+        codigo = self.blcodigobox.get().strip()
+        if not codigo:
+            return
+
+        try:
+            cantidad = int(self.blcantidadbox.get().strip())
+            if cantidad <= 0:
+                messagebox.showerror("Error", "No se permiten cantidades negativas.")
                 return
-    
-            try:
-                cantidad = int(self.blcantidadbox.get().strip())
-                if cantidad <= 0:
-                    messagebox.showerror("Error", "No se permiten cantidades negativas.")
-                    return
-            except ValueError:
-                cantidad = 1
-                self.blcantidadbox.delete(0, END)
-                self.blcantidadbox.insert(0, str(cantidad))
-    
-            productos = buscar_producto_por_codigo(codigo)
-            if not productos:
-                messagebox.showerror("Error", "Producto no encontrado.")
-                return
-    
-            nombre = productos['nombre']
-            detalles = productos['detalles']
-    
-            self.bldetallesbox.configure(state="normal")
-            self.bldetallesbox.delete(0, END)
-            self.bldetallesbox.insert(0, f"{nombre} - {detalles}")
-            self.bldetallesbox.configure(state="disabled")
+        except ValueError:
+            cantidad = 1
+            self.blcantidadbox.delete(0, END)
+            self.blcantidadbox.insert(0, str(cantidad))
+
+        producto = obtener_producto_de_proveedor(codigo, id_prov)
+        if not producto:
+            messagebox.showerror(
+                "No válido",
+                "El producto no existe o no pertenece al proveedor seleccionado."
+            )
+            return
+
+        nombre = producto.get('nombre') or ''
+        descripcion = producto.get('descripcion') or ''
+
+        self.bldetallesbox.configure(state="normal")
+        self.bldetallesbox.delete(0, END)
+        self.bldetallesbox.insert(0, f"{nombre} - {descripcion}")
+        self.bldetallesbox.configure(state="disabled")
     
     def subirsistema(self):
         pass

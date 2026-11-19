@@ -316,9 +316,59 @@ class FrameProvedor(ctk.CTkFrame):
             self.pedidos,
             values=[""],
             height=50,
-            width=300
+            width=300,
+            command=self.obtenerfaltantes
         )
         self.pedidoscombo.pack(pady=5)
+
+        self.provedorfaltante=ctk.CTkLabel(
+            self.pedidos,
+            text="Proveedor designado", 
+            font=("Arial", 12, "bold")
+        )
+        self.provedorfaltante.pack(pady=3)
+        self.provedorfaltantebox=ctk.CTkEntry(self.pedidos, width=200)
+        self.provedorfaltantebox.configure(state="disabled")
+
+        self.btactualizar=ctk.CTkButton(
+            self.pedidos,
+            text="Actualizar",
+            fg_color="#1D69B9",
+            hover_color="#1D32A9",
+            text_color="#FFFFFF",
+            command=self.actualizarpedido
+        )
+        self.btactualizar.pack(pady=5)
+
+        self.btaenviar=ctk.CTkButton(
+            self.pedidos,
+            text="Enviar",
+            fg_color="#3AB91D",
+            hover_color="#2D7E10",
+            text_color="#FFFFFF",
+            command=self.enviar
+        )
+        self.btaenviar.pack(pady=5)
+
+        self.btborrar=ctk.CTkButton(
+            self.pedidos,
+            text="Actualizar",
+            fg_color="#B91D1D",
+            hover_color="#A91D1D",
+            text_color="#FFFFFF",
+            command=self.borrar
+        )
+        self.btborrar.pack(pady=5)
+
+        self.btcancelar=ctk.CTkButton(
+            self.pedidos,
+            text="Cancelar",
+            fg_color="#B91D1D",
+            hover_color="#A91D1D",
+            text_color="#FFFFFF",
+            command=self.cancelarpedido
+        )
+        self.btcancelar.pack(pady=5)
 
         self.proveedor_actual_id = None
         self.cargar_proveedores()
@@ -326,7 +376,10 @@ class FrameProvedor(ctk.CTkFrame):
         self.producto_actual_id = None
         self.cargar_productos()
 
-    
+
+
+    def obtenerfaltantes(self):
+        pass
 
     def cargar_productos(self):
         productos = obtener_productos()
@@ -575,3 +628,12 @@ class FrameProvedor(ctk.CTkFrame):
 
         self.cestadobox.delete(0, END)
         self.cestadobox.insert(0, datos["estado"] or "")
+
+    def actualizarpedido(self):
+        pass
+    def enviar(self):
+        pass
+    def borrar(self):
+        pass
+    def cancelarpedido(self):
+        pass

@@ -81,6 +81,10 @@ class VentanaBusqueda(ctk.CTkToplevel):
         self.tabla_resultados.columnconfigure(4, weight=1)
 
         self.after(100, lambda: self.entry_busqueda.focus())
+        if self.modo == "faltantes" and self.id_proveedor:
+            self.ejecutar_busqueda()
+
+        self.after(100, lambda: self.entry_busqueda.focus())
 
     def ejecutar_busqueda(self, event=None):
         criterio = self.entry_busqueda.get().strip()
@@ -96,6 +100,8 @@ class VentanaBusqueda(ctk.CTkToplevel):
         if self.modo == "faltantes" and self.id_proveedor:
             resultados = buscar_productos_por_proveedor(criterio, self.id_proveedor)
         else:
+            if not criterio:
+                return
             resultados = buscar_productos_coincidentes(criterio)
 
         # Renderizar filas
