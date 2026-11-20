@@ -962,26 +962,31 @@ def revisar_stock(codigo):
             conexion.close()
 
 def buscar_productos_coincidentes(criterio):
+    conexion = None
+    cursor = None
     try:
         conexion = obtener_conexion()
         cursor = conexion.cursor(dictionary=True)
-        
+
         query = """
-            SELECT codigobarras, nombre, stock, precio_venta 
-            FROM productos 
-            WHERE codigobarras LIKE %s OR nombre LIKE %s 
+            SELECT p.codigobarras, p.nombre, p.stock, p.precio_venta,
+                   COALESCE(pr.nombre, 'Sin proveedor') AS proveedor
+            FROM productos p
+            LEFT JOIN proveedores pr ON p.idprovedor = pr.id
+            WHERE p.codigobarras LIKE %s OR p.nombre LIKE %s
             LIMIT 20
         """
         patron = f"%{criterio}%"
         cursor.execute(query, (patron, patron))
-        
-        resultados = cursor.fetchall()
-        cursor.close()
-        conexion.close()
-        return resultados
+        return cursor.fetchall()
     except Exception as e:
         messagebox.showerror("Error", f"No se encontró el producto: {e}")
         return []
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
 
 def buscar_productos_por_proveedor(criterio, id_proveedor):
     try:
@@ -1380,6 +1385,32 @@ def eliminarpromocion(promo_id):
         if conexion:
             conexion.rollback()
         return False, f"Error al eliminar promoción: {e}"
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+def obtener_producto_con_proveedor(codigo):
+    """Busca un producto por código o código de barras junto con el nombre de su proveedor"""
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+        sql = """
+            SELECT p.codigo, p.codigobarras, p.nombre, p.descripcion,
+                     p.idprovedor,
+                   COALESCE(pr.nombre, 'Sin proveedor') AS nombre_proveedor
+            FROM productos p
+            LEFT JOIN proveedores pr ON p.idprovedor = pr.id
+            WHERE p.codigo = %s OR p.codigobarras = %s
+            LIMIT 1
+        """
+        cursor.execute(sql, (codigo, codigo))
+        return cursor.fetchone()
+    except Exception as e:
+        print(f"Error al buscar producto con proveedor: {e}")
+        return None
     finally:
         if cursor:
             cursor.close()

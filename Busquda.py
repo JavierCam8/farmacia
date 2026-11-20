@@ -11,8 +11,10 @@ class VentanaBusqueda(ctk.CTkToplevel):
         self.al_seleccionar_callback = al_seleccionar_callback
 
         # Personalizar el título según el contexto
-        if self.modo == "faltantes":
+        if self.modo == "faltantes" and self.id_proveedor:
             self.title("Búsqueda de productos por Proveedor")
+        elif self.modo == "faltantes":
+            self.title("Búsqueda de productos (Todos los proveedores)")
         else:
             self.title("Búsqueda general de productos")
 
@@ -81,10 +83,6 @@ class VentanaBusqueda(ctk.CTkToplevel):
         self.tabla_resultados.columnconfigure(4, weight=1)
 
         self.after(100, lambda: self.entry_busqueda.focus())
-        if self.modo == "faltantes" and self.id_proveedor:
-            self.ejecutar_busqueda()
-
-        self.after(100, lambda: self.entry_busqueda.focus())
 
     def ejecutar_busqueda(self, event=None):
         criterio = self.entry_busqueda.get().strip()
@@ -100,19 +98,20 @@ class VentanaBusqueda(ctk.CTkToplevel):
         if self.modo == "faltantes" and self.id_proveedor:
             resultados = buscar_productos_por_proveedor(criterio, self.id_proveedor)
         else:
-            if not criterio:
-                return
             resultados = buscar_productos_coincidentes(criterio)
 
         # Renderizar filas
         for i, prod in enumerate(resultados):
             codigo = prod.get('codigobarras', '')
             nombre = prod.get('nombre', '')
+            prov = prod.get('proveedor', '')
             stock = prod.get('stock', 0)
             precio = prod.get('precio_venta', 0.0)
 
+            texto_nombre = f"{nombre} [{prov}]" if (self.modo == "faltantes" and prov) else nombre
+
             lbl_cod = ctk.CTkLabel(self.tabla_resultados, text=str(codigo), anchor="center")
-            lbl_nom = ctk.CTkLabel(self.tabla_resultados, text=nombre, anchor="w")
+            lbl_nom = ctk.CTkLabel(self.tabla_resultados, text=texto_nombre, anchor="w")
             lbl_stk = ctk.CTkLabel(self.tabla_resultados, text=str(stock), anchor="center")
             lbl_pre = ctk.CTkLabel(self.tabla_resultados, text=f"${precio:.2f}", anchor="center")
 

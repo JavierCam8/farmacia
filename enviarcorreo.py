@@ -1,47 +1,50 @@
 import os
 import smtplib
-from email.message import EmailMessage
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 
 
 def enviar_correo(destinatario, asunto, cuerpo, ruta_adjunto=None):
-    remitente = "correopuebas1@gmail.com"
-    password_app = "Prueba.123"  # Tu clave de aplicación de 16 letras
+    # Configuración
+    sender_email = "@gmail.com"
+    password = ""  # Contraseña de aplicación de Gmail (16 letras)
+    smtp_server = "smtp.gmail.com"
+    port = 587
 
-    if "tu_correo" in remitente or "xxxx" in password_app:
-        return False, "Configura primero tu correo real y contraseña de aplicación en enviarcorreo.py."
+    if "tu_correo" in sender_email or "xxxx" in password:
+        return False, "Configura tu correo real y contraseña de aplicación en enviarcorreo.py."
 
-    # Quitar espacios de la contraseña de aplicación para evitar errores de lectura
-    password_limpia = password_app.replace(" ", "").strip()
+    # Crear mensaje
+    message = MIMEMultipart()
+    message["From"] = sender_email
+    message["To"] = destinatario
+    message["Subject"] = asunto
+    message.attach(MIMEText(cuerpo, "plain", "utf-8"))
 
-    msg = EmailMessage()
-    msg["From"] = remitente
-    msg["To"] = destinatario
-    msg["Subject"] = asunto
-    msg.set_content(cuerpo)
-
+    # Adjuntar el archivo .txt de faltantes si existe
     if ruta_adjunto and os.path.exists(ruta_adjunto):
-        with open(ruta_adjunto, "rb") as archivo:
-            contenido = archivo.read()
         nombre_archivo = os.path.basename(ruta_adjunto)
-        msg.add_attachment(
-            contenido,
-            maintype="text",
-            subtype="plain",
-            filename=nombre_archivo,
+        with open(ruta_adjunto, "rb") as archivo:
+            parte = MIMEBase("application", "octet-stream")
+            parte.set_payload(archivo.read())
+        encoders.encode_base64(parte)
+        parte.add_header(
+            "Content-Disposition",
+            f'attachment; filename="{nombre_archivo}"',
         )
+        message.attach(parte)
 
+    # Enviar correo
     try:
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as smtp:
-            smtp.ehlo()
-            smtp.starttls()
-            smtp.ehlo()
-            smtp.login(remitente, password_limpia)
-            smtp.send_message(msg)
+        password_limpia = password.replace(" ", "").strip()
+        with smtplib.SMTP(smtp_server, port, timeout=20) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(sender_email, password_limpia)
+            server.sendmail(sender_email, destinatario, message.as_string())
         return True, "Correo enviado correctamente."
-
-    except smtplib.SMTPAuthenticationError:
-        return False, "Correo o contraseña de aplicación incorrectos. Verifica tu clave de 16 letras."
-    except smtplib.SMTPServerDisconnected:
-        return False, "El servidor o tu antivirus/red cerró la conexión. Prueba desactivando temporalmente el escudo de correo o cambiando de Wi-Fi."
     except Exception as e:
         return False, f"No se pudo enviar el correo: {e}"

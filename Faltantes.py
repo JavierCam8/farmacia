@@ -4,14 +4,17 @@ import customtkinter as ctk
 from tkinter import messagebox, END
 from Busquda import VentanaBusqueda, VentanaBusquedaProveedor
 from ListaFaltantes import listafaltantes
-from Conexion import buscar_producto_por_codigo, obtener_producto_de_proveedor, obtener_nombre_proveedor, buscarprovedor
+from Conexion import obtener_producto_con_proveedor, buscarprovedor
+
 
 class FrameFaltantes(ctk.CTkFrame):
     def __init__(self, parent):
         super().__init__(parent)
 
         self.lista_productos = []
-        self.nombre_proveedor = ""
+        self.producto_actual = None
+        self.filtro_proveedor_id = None
+        self.filtro_proveedor_nombre = ""
 
         self.contenedor = ctk.CTkFrame(self, fg_color="transparent")
         self.contenedor.pack(fill="both", expand=True, padx=15, pady=10)
@@ -29,7 +32,7 @@ class FrameFaltantes(ctk.CTkFrame):
         self.comandos.pack(side="top", fill="x")
 
         # ====================================================
-        # 2. CONTENIDO DEL BLOQUE SUPERIOR (TABLA EN 3 SECCIONES)
+        # 2. CONTENIDO DEL BLOQUE SUPERIOR (TABLA EN 4 SECCIONES)
         # ====================================================
         self.lbtutulo = ctk.CTkLabel(
             self.arriba,
@@ -38,48 +41,44 @@ class FrameFaltantes(ctk.CTkFrame):
         )
         self.lbtutulo.pack(side="top", pady=(15, 10))
 
-        # Contenedor para las 3 columnas
+        # Contenedor para las 4 columnas
         self.frame_columnas = ctk.CTkFrame(self.arriba, fg_color="transparent")
         self.frame_columnas.pack(side="top", fill="both", expand=True, padx=15, pady=(0, 15))
 
-        # Configuración del GRID (0: Código, 1: Cantidad, 2: Detalles)
+        # Configuración del GRID (0: Código, 1: Cantidad, 2: Detalles, 3: Proveedor)
         self.frame_columnas.grid_columnconfigure(0, weight=1)
         self.frame_columnas.grid_columnconfigure(1, weight=1)
         self.frame_columnas.grid_columnconfigure(2, weight=2)
+        self.frame_columnas.grid_columnconfigure(3, weight=1)
         self.frame_columnas.grid_rowconfigure(0, weight=1)
 
         # SECCIÓN 1: CÓDIGO
         self.codigoframe = ctk.CTkScrollableFrame(self.frame_columnas, fg_color="#2B2B2B", corner_radius=8)
         self.codigoframe.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 
-        self.lcodigo = ctk.CTkLabel(
-            self.codigoframe,
-            text="Código",
-            font=("Arial", 16, "bold")
-        )
+        self.lcodigo = ctk.CTkLabel(self.codigoframe, text="Código", font=("Arial", 16, "bold"))
         self.lcodigo.pack(pady=10)
 
         # SECCIÓN 2: CANTIDAD
         self.cantidadframe = ctk.CTkScrollableFrame(self.frame_columnas, fg_color="#2B2B2B", corner_radius=8)
         self.cantidadframe.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
 
-        self.lcantidad = ctk.CTkLabel(
-            self.cantidadframe,
-            text="Cantidad",
-            font=("Arial", 16, "bold")
-        )
+        self.lcantidad = ctk.CTkLabel(self.cantidadframe, text="Cantidad", font=("Arial", 16, "bold"))
         self.lcantidad.pack(pady=10)
 
         # SECCIÓN 3: DETALLES
         self.detallesframe = ctk.CTkScrollableFrame(self.frame_columnas, fg_color="#2B2B2B", corner_radius=8)
         self.detallesframe.grid(row=0, column=2, sticky="nsew", padx=5, pady=5)
 
-        self.ldetalles = ctk.CTkLabel(
-            self.detallesframe,
-            text="Detalles",
-            font=("Arial", 16, "bold")
-        )
+        self.ldetalles = ctk.CTkLabel(self.detallesframe, text="Detalles", font=("Arial", 16, "bold"))
         self.ldetalles.pack(pady=10)
+
+        # SECCIÓN 4: PROVEEDOR
+        self.proveedorframe = ctk.CTkScrollableFrame(self.frame_columnas, fg_color="#2B2B2B", corner_radius=8)
+        self.proveedorframe.grid(row=0, column=3, sticky="nsew", padx=5, pady=5)
+
+        self.lproveedor = ctk.CTkLabel(self.proveedorframe, text="Proveedor", font=("Arial", 16, "bold"))
+        self.lproveedor.pack(pady=10)
 
         # ====================================================
         # 3. BLOQUE MEDIO (FORMULARIO DE CAPTURA)
@@ -87,13 +86,14 @@ class FrameFaltantes(ctk.CTkFrame):
         self.frame_medio_inner = ctk.CTkFrame(self.medio, fg_color="transparent")
         self.frame_medio_inner.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # Campo 1: Proveedor
+        # Campo 1: Proveedor (se detecta automáticamente al cargar el producto)
         self.f_prov = ctk.CTkFrame(self.frame_medio_inner, fg_color="transparent")
         self.f_prov.pack(side="left", padx=5)
-        self.blprovedor = ctk.CTkLabel(self.f_prov, text="ID / Proveedor:", font=("Arial", 11, "bold"))
+        self.blprovedor = ctk.CTkLabel(self.f_prov, text="Proveedor:", font=("Arial", 11, "bold"))
         self.blprovedor.pack(anchor="w")
-        self.blprovedorbox = ctk.CTkEntry(self.f_prov, width=150)
+        self.blprovedorbox = ctk.CTkEntry(self.f_prov, width=160)
         self.blprovedorbox.pack(pady=(2, 0))
+        self.blprovedorbox.configure(state="disabled")
 
         # Campo 2: Código
         self.f_cod = ctk.CTkFrame(self.frame_medio_inner, fg_color="transparent")
@@ -108,7 +108,7 @@ class FrameFaltantes(ctk.CTkFrame):
         self.f_cant.pack(side="left", padx=5)
         self.blcantidad = ctk.CTkLabel(self.f_cant, text="Cantidad:", font=("Arial", 11, "bold"))
         self.blcantidad.pack(anchor="w")
-        self.blcantidadbox = ctk.CTkEntry(self.f_cant, width=120)
+        self.blcantidadbox = ctk.CTkEntry(self.f_cant, width=110)
         self.blcantidadbox.pack(pady=(2, 0))
 
         # Campo 4: Detalles
@@ -164,7 +164,7 @@ class FrameFaltantes(ctk.CTkFrame):
         self.frame_cmd_inner = ctk.CTkFrame(self.comandos, fg_color="transparent")
         self.frame_cmd_inner.pack(fill="both", expand=True, padx=15, pady=12)
 
-        # --- F1 ---
+        # --- F1 (Filtro opcional por proveedor) ---
         self.item_f1 = ctk.CTkFrame(self.frame_cmd_inner, fg_color="transparent")
         self.item_f1.pack(side="left", padx=(0, 30))
 
@@ -181,10 +181,10 @@ class FrameFaltantes(ctk.CTkFrame):
         )
         self.f1.pack(side="left", padx=(0, 8))
 
-        self.lf1 = ctk.CTkLabel(self.item_f1, text="Buscar Proveedor", font=("Arial", 12, "bold"))
+        self.lf1 = ctk.CTkLabel(self.item_f1, text="Filtrar Proveedor", font=("Arial", 12, "bold"))
         self.lf1.pack(side="left")
 
-        # --- F2 ---
+        # --- F2 (Buscar en todos los productos o del proveedor filtrado) ---
         self.item_f2 = ctk.CTkFrame(self.frame_cmd_inner, fg_color="transparent")
         self.item_f2.pack(side="left", padx=30)
 
@@ -224,6 +224,7 @@ class FrameFaltantes(ctk.CTkFrame):
         self.lf3 = ctk.CTkLabel(self.item_f3, text="Cancelar Producto", font=("Arial", 12, "bold"))
         self.lf3.pack(side="left")
 
+        # --- F4 ---
         self.item_f4 = ctk.CTkFrame(self.frame_cmd_inner, fg_color="transparent")
         self.item_f4.pack(side="left", padx=30)
 
@@ -244,7 +245,6 @@ class FrameFaltantes(ctk.CTkFrame):
         self.lf4.pack(side="left")
 
         # Atajos de teclado
-        self.blprovedorbox.bind("<Return>", lambda e: self.blcodigobox.focus())
         self.blcodigobox.bind("<Return>", self.enter)
         self.blcantidadbox.bind("<Return>", self.enter)
 
@@ -258,82 +258,137 @@ class FrameFaltantes(ctk.CTkFrame):
     # LÓGICA DE EVENTOS Y ACCIONES
     # ====================================================
     def busquedaprovedor(self):
-        """Abre el modal de búsqueda de proveedores (F1) y bloquea la selección al elegir"""
-        if self.f1.cget("state") == "disabled":
-            return
-
+        """Filtro opcional (F1): si se elige un proveedor, F2 solo mostrará sus productos hasta presionar Cancelar"""
         def al_elegir(prov):
-            self.blprovedorbox.configure(state="normal")
-            self.blprovedorbox.delete(0, 'end')
-            self.blprovedorbox.insert(0, str(prov.get('id', '')))
-            self.nombre_proveedor = prov.get('nombre', '')
+            self.filtro_proveedor_id = prov.get("id")
+            self.filtro_proveedor_nombre = prov.get("nombre", "")
 
-            # Bloquear el Entry y el botón F1 hasta que se suba o cancele el pedido
+            self.blprovedorbox.configure(state="normal")
+            self.blprovedorbox.delete(0, END)
+            self.blprovedorbox.insert(0, f"Filtro: {self.filtro_proveedor_nombre}")
             self.blprovedorbox.configure(state="disabled")
-            self.f1.configure(state="disabled")
             self.blcodigobox.focus()
 
         VentanaBusquedaProveedor(self, al_seleccionar_callback=al_elegir)
 
     def busquedacodigo(self):
-        """Verifica que haya proveedor antes de abrir el modal de productos (F2)"""
-        id_prov = self.blprovedorbox.get().strip()
-        if not id_prov:
-            messagebox.showwarning(
-                "Proveedor requerido",
-                "Primero seleccione un proveedor (F1) antes de buscar productos."
-            )
-            return
-
+        """Abre el buscador general de productos (o filtrado si se usó F1)"""
         def al_elegir(codigo):
-            self.blcodigobox.delete(0, 'end')
+            self.blcodigobox.delete(0, END)
             self.blcodigobox.insert(0, codigo)
-            self.enter()  # Carga automáticamente los detalles al seleccionar
+            self.enter()
 
         VentanaBusqueda(
             self,
             al_seleccionar_callback=al_elegir,
             modo="faltantes",
-            id_proveedor=id_prov
+            id_proveedor=self.filtro_proveedor_id
         )
 
     def cancelar(self):
-        """Limpia todas las cajas del formulario"""
-        self.nombre_proveedor = ""
-        self.blprovedorbox.delete(0, 'end')
-        self.blcodigobox.delete(0, 'end')
-        self.blcantidadbox.delete(0, 'end')
+        """Limpia las cajas del formulario y quita cualquier filtro de proveedor"""
+        self.producto_actual = None
+        self.filtro_proveedor_id = None
+        self.filtro_proveedor_nombre = ""
+
+        self.blprovedorbox.configure(state="normal")
+        self.blprovedorbox.delete(0, END)
+        self.blprovedorbox.configure(state="disabled")
+
+        self.blcodigobox.delete(0, END)
+        self.blcantidadbox.delete(0, END)
+
         self.bldetallesbox.configure(state="normal")
-        self.bldetallesbox.delete(0, 'end')
+        self.bldetallesbox.delete(0, END)
         self.bldetallesbox.configure(state="disabled")
+        self.blcodigobox.focus()
 
     def borrarproducto(self):
-        """Limpia solo la casilla de producto, cantidad y detalles (F3)"""
-        self.blcodigobox.delete(0, 'end')
-        self.blcantidadbox.delete(0, 'end')
+        """Limpia solo la captura del producto actual (F3), conservando el filtro si existe"""
+        self.producto_actual = None
+        self.blcodigobox.delete(0, END)
+        self.blcantidadbox.delete(0, END)
+
         self.bldetallesbox.configure(state="normal")
-        self.bldetallesbox.delete(0, 'end')
+        self.bldetallesbox.delete(0, END)
         self.bldetallesbox.configure(state="disabled")
-        
+
+        self.blprovedorbox.configure(state="normal")
+        self.blprovedorbox.delete(0, END)
+        if self.filtro_proveedor_nombre:
+            self.blprovedorbox.insert(0, f"Filtro: {self.filtro_proveedor_nombre}")
+        self.blprovedorbox.configure(state="disabled")
+        self.blcodigobox.focus()
+
     def renderizar_tabla(self):
-            """Limpia los widgets visuales de las 3 columnas y los vuelve a dibujar desde self.lista_productos"""
-            columnas = [self.codigoframe, self.cantidadframe, self.detallesframe]
-    
-            for frame in columnas:
-                widgets = frame.winfo_children()
-                for w in widgets[1:]:
-                    w.destroy()
-    
-            for p in self.lista_productos:
-                ctk.CTkLabel(self.codigoframe, text=p["codigo"], font=("Arial", 12)).pack(pady=2)
-                ctk.CTkLabel(self.cantidadframe, text=str(p["cantidad"]), font=("Arial", 12)).pack(pady=2)
-                ctk.CTkLabel(self.detallesframe, text=p["detalles"], font=("Arial", 12)).pack(pady=2)
-    
+        """Dibuja las 4 columnas (Código, Cantidad, Detalles, Proveedor) desde self.lista_productos"""
+        columnas = [self.codigoframe, self.cantidadframe, self.detallesframe, self.proveedorframe]
+
+        for frame in columnas:
+            widgets = frame.winfo_children()
+            for w in widgets[1:]:
+                w.destroy()
+
+        for p in self.lista_productos:
+            ctk.CTkLabel(self.codigoframe, text=p["codigo"], font=("Arial", 12)).pack(pady=2)
+            ctk.CTkLabel(self.cantidadframe, text=str(p["cantidad"]), font=("Arial", 12)).pack(pady=2)
+            ctk.CTkLabel(self.detallesframe, text=p["detalles"], font=("Arial", 12)).pack(pady=2)
+            ctk.CTkLabel(self.proveedorframe, text=p["proveedor"], font=("Arial", 12, "bold"), text_color="#60A5FA").pack(pady=2)
+
+    def enter(self, event=None):
+        """Busca el producto en toda la base de datos y muestra automáticamente su proveedor y detalles"""
+        codigo = self.blcodigobox.get().strip()
+        if not codigo:
+            return
+
+        try:
+            cantidad = int(self.blcantidadbox.get().strip())
+            if cantidad <= 0:
+                messagebox.showerror("Error", "No se permiten cantidades negativas o cero.")
+                return
+        except ValueError:
+            cantidad = 1
+            self.blcantidadbox.delete(0, END)
+            self.blcantidadbox.insert(0, str(cantidad))
+
+        producto = obtener_producto_con_proveedor(codigo)
+        if not producto:
+            messagebox.showerror("No encontrado", f"El producto '{codigo}' no existe en la base de datos.")
+            return
+
+        if self.filtro_proveedor_id and str(producto.get("idprovedor")) != str(self.filtro_proveedor_id):
+            messagebox.showwarning(
+                "Proveedor distinto al filtro",
+                f"Este producto pertenece a '{producto.get('nombre_proveedor')}', "
+                f"pero tienes activo el filtro '{self.filtro_proveedor_nombre}'.\n\n"
+                "Presione Cancelar si desea capturar productos de todos los proveedores."
+            )
+            return
+
+        self.producto_actual = producto
+        nombre = producto.get("nombre") or ""
+        descripcion = producto.get("descripcion") or ""
+        nombre_prov = producto.get("nombre_proveedor") or "Sin proveedor"
+        texto_detalles = f"{nombre} - {descripcion}" if descripcion else nombre
+
+        self.blprovedorbox.configure(state="normal")
+        self.blprovedorbox.delete(0, END)
+        self.blprovedorbox.insert(0, nombre_prov)
+        self.blprovedorbox.configure(state="disabled")
+
+        self.bldetallesbox.configure(state="normal")
+        self.bldetallesbox.delete(0, END)
+        self.bldetallesbox.insert(0, texto_detalles)
+        self.bldetallesbox.configure(state="disabled")
 
     def subir(self):
-        """Agrega un producto validado a la lista en memoria y actualiza la tabla"""
+        """Agrega el producto junto con su proveedor a la tabla"""
         codigo = self.blcodigobox.get().strip()
         detalles = self.bldetallesbox.get().strip()
+
+        if not codigo or not detalles or not self.producto_actual:
+            messagebox.showwarning("Advertencia", "Primero presione Enter para cargar los datos del producto.")
+            return
 
         try:
             cantidad = int(self.blcantidadbox.get().strip())
@@ -343,95 +398,59 @@ class FrameFaltantes(ctk.CTkFrame):
         except ValueError:
             cantidad = 1
 
-        if not codigo or not detalles:
-            messagebox.showwarning("Advertencia", "Primero presione Enter para cargar los datos del producto.")
-            return
+        nombre_prov = self.producto_actual.get("nombre_proveedor") or "Sin proveedor"
+        id_prov = self.producto_actual.get("idprovedor")
 
         for item in self.lista_productos:
             if item["codigo"] == codigo:
                 item["cantidad"] += cantidad
                 self.renderizar_tabla()
-                self.borrarproducto()  # Conserva el proveedor seleccionado
+                self.borrarproducto()
                 return
 
         self.lista_productos.append({
             "codigo": codigo,
             "cantidad": cantidad,
-            "detalles": detalles
+            "detalles": detalles,
+            "id_proveedor": id_prov,
+            "proveedor": nombre_prov
         })
 
         self.renderizar_tabla()
-        self.borrarproducto()  # Conserva el proveedor seleccionado
+        self.borrarproducto()
 
-    def enter(self, event=None):
-        id_prov = self.blprovedorbox.get().strip()
-        if not id_prov:
-            messagebox.showwarning("Proveedor requerido", "Primero seleccione un proveedor.")
-            return
-
-        codigo = self.blcodigobox.get().strip()
-        if not codigo:
-            return
-
-        try:
-            cantidad = int(self.blcantidadbox.get().strip())
-            if cantidad <= 0:
-                messagebox.showerror("Error", "No se permiten cantidades negativas.")
-                return
-        except ValueError:
-            cantidad = 1
-            self.blcantidadbox.delete(0, END)
-            self.blcantidadbox.insert(0, str(cantidad))
-
-        producto = obtener_producto_de_proveedor(codigo, id_prov)
-        if not producto:
-            messagebox.showerror(
-                "No válido",
-                "El producto no existe o no pertenece al proveedor seleccionado."
-            )
-            return
-
-        nombre = producto.get('nombre') or ''
-        descripcion = producto.get('descripcion') or ''
-        texto_detalles = f"{nombre} - {descripcion}" if descripcion else nombre
-
-        self.bldetallesbox.configure(state="normal")
-        self.bldetallesbox.delete(0, END)
-        self.bldetallesbox.insert(0, texto_detalles)
-        self.bldetallesbox.configure(state="disabled")
-    
     def subirsistema(self):
-        """Genera/actualiza el archivo .txt de faltantes del proveedor y limpia la tabla (F4)"""
-        id_prov = self.blprovedorbox.get().strip()
-        if not id_prov:
-            messagebox.showwarning("Proveedor requerido", "Seleccione un proveedor antes de subir la lista.")
-            return
-
+        """Separa los productos por proveedor y genera un archivo .txt independiente por cada uno (F4)"""
         if not self.lista_productos:
             messagebox.showwarning("Lista vacía", "Agregue al menos un producto a la tabla antes de subir.")
             return
 
-        # Obtener el nombre del proveedor (desde F1 o consultando por ID en MySQL)
-        nombre_prov = self.nombre_proveedor or obtener_nombre_proveedor(id_prov)
-        if not nombre_prov:
-            messagebox.showerror("Error", "El ID del proveedor no existe en la base de datos.")
-            return
+        # Agrupar productos por nombre de proveedor conservando el orden
+        grupos_por_proveedor = {}
+        for item in self.lista_productos:
+            prov = item.get("proveedor") or "Sin_Proveedor"
+            grupos_por_proveedor.setdefault(prov, []).append(item)
 
         try:
-            # Genera o acumula en Faltantes/Faltantes_<nombre_prov>.txt y lo abre
-            listafaltantes(nombre_prov, self.lista_productos)
+            proveedores_generados = []
+            for nombre_prov, productos_prov in grupos_por_proveedor.items():
+                listafaltantes(nombre_prov, productos_prov)
+                proveedores_generados.append(f"• {nombre_prov} ({len(productos_prov)} prod.)")
 
-            # Limpiar tabla en memoria, vista y formulario para el siguiente pedido
             self.lista_productos.clear()
             self.renderizar_tabla()
             self.cancelar()
 
-            messagebox.showinfo("Éxito", f"Lista de faltantes guardada para {nombre_prov}.")
+            resumen = "\n".join(proveedores_generados)
+            messagebox.showinfo(
+                "Listas generadas",
+                f"Se separaron y guardaron las listas de faltantes por proveedor:\n\n{resumen}"
+            )
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo generar el archivo de faltantes: {e}")
+            messagebox.showerror("Error", f"No se pudieron generar los archivos de faltantes: {e}")
 
     def cargar_desde_txt(self, ruta_archivo):
-        """Lee un archivo .txt de faltantes, asigna el proveedor y despliega los productos en la tabla"""
+        """Lee un archivo .txt de faltantes y despliega sus productos con su proveedor en la tabla"""
         if not os.path.exists(ruta_archivo):
             return
 
@@ -449,11 +468,9 @@ class FrameFaltantes(ctk.CTkFrame):
                         nombre_prov = texto.replace("Proveedor:", "").strip()
                         continue
 
-                    # Omitir encabezados de columna
                     if texto.lower().startswith(("código", "codigo")) and ("cantidad" in texto.lower() or "detalles" in texto.lower()):
                         continue
 
-                    # Parsear líneas separadas por '|' o tabulador
                     separador = "|" if "|" in texto else ("\t" if "\t" in texto else None)
                     if separador:
                         partes = [p.strip() for p in texto.split(separador) if p.strip()]
@@ -472,7 +489,8 @@ class FrameFaltantes(ctk.CTkFrame):
                             productos_cargados.append({
                                 "codigo": cod,
                                 "cantidad": cant,
-                                "detalles": det
+                                "detalles": det,
+                                "proveedor": nombre_prov
                             })
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo leer la lista de faltantes: {e}")
@@ -481,14 +499,13 @@ class FrameFaltantes(ctk.CTkFrame):
         if not nombre_prov:
             nombre_prov = os.path.basename(ruta_archivo).replace("Faltantes_", "").replace(".txt", "")
 
-        # Buscar el ID del proveedor en MySQL para rellenar el campo ID / Proveedor
         datos_prov = buscarprovedor(nombre_prov)
-        self.blprovedorbox.delete(0, END)
-        if datos_prov:
-            self.blprovedorbox.insert(0, str(datos_prov["id"]))
-            self.nombre_proveedor = datos_prov["nombre"]
-        else:
-            self.nombre_proveedor = nombre_prov
+        id_prov = datos_prov["id"] if datos_prov else None
+        prov_final = datos_prov["nombre"] if datos_prov else nombre_prov
+
+        for item in productos_cargados:
+            item["id_proveedor"] = id_prov
+            item["proveedor"] = prov_final
 
         self.lista_productos = productos_cargados
         self.renderizar_tabla()
