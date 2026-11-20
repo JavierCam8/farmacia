@@ -886,14 +886,16 @@ def obtener_cliente_por_id(id_cliente=1):
 ########################################## PROMOCIONES
 
 def obtener_detalle_producto(codigo):
-    """Busca un solo producto por código o código de barras y devuelve su nombre"""
+    """Busca un producto por código o código de barras e incluye su requisito y categoría"""
     conexion = None
     cursor = None
     try:
         conexion = obtener_conexion()
         cursor = conexion.cursor(dictionary=True)
         sql = """
-            SELECT codigo, codigobarras, nombre, precio_venta
+            SELECT codigo, codigobarras, nombre, precio_venta,
+                   COALESCE(requisito, 'Ninguno') AS requisito,
+                   COALESCE(categoria, 'Sin limitaciones') AS categoria
             FROM productos
             WHERE codigo = %s OR codigobarras = %s
             LIMIT 1
@@ -910,9 +912,59 @@ def obtener_detalle_producto(codigo):
             conexion.close()
 
 
+def validar_compatibilidad_promocion(codigos):
+    """Verifica que los productos de una promoción no estén repetidos ni tengan condiciones incompatibles"""
+    codigos_validos = [c for c in codigos if c]
+    if not codigos_validos:
+        return False, "Debe agregar al menos un producto a la promoción."
+
+    productos = []
+    ids_vistos = set()
+
+    for cod in codigos_validos:
+        prod = obtener_detalle_producto(cod)
+        if not prod:
+            return False, f"El producto '{cod}' no existe en la base de datos."
+
+        clave_unica = prod.get("codigo") or prod.get("codigobarras") or str(cod)
+        if clave_unica in ids_vistos:
+            return False, f"El producto '{prod['nombre']}' está repetido. Use el campo Cantidad para agregar más unidades."
+        ids_vistos.add(clave_unica)
+
+        requisito = str(prod.get("requisito") or "Ninguno").strip()
+        categoria = str(prod.get("categoria") or "Sin limitaciones").strip()
+
+        if requisito in ("Receta", "Identificación") or categoria == "Limitado":
+            return False, (
+                f"'{prod['nombre']}' no es compatible con promociones "
+                f"(Requisito: {requisito} | Categoría: {categoria})."
+            )
+
+        productos.append(prod)
+
+    # Verificar que todos compartan exactamente el mismo requisito y categoría
+    req_base = str(productos[0].get("requisito") or "Ninguno").strip()
+    cat_base = str(productos[0].get("categoria") or "Sin limitaciones").strip()
+
+    for prod in productos[1:]:
+        req_actual = str(prod.get("requisito") or "Ninguno").strip()
+        cat_actual = str(prod.get("categoria") or "Sin limitaciones").strip()
+        if req_actual != req_base or cat_actual != cat_base:
+            return False, (
+                f"Productos incompatibles: '{productos[0]['nombre']}' ({req_base} / {cat_base}) "
+                f"no se puede combinar con '{prod['nombre']}' ({req_actual} / {cat_actual})."
+            )
+
+    return True, "Productos compatibles."
+
+
 def guardarpromocion(nombre, fproducto, fcantidad, sproducto, scantidad, tproducto, tcantidad, precio):
     if not all([nombre, fproducto, fcantidad, precio]):
         return False, "Complete al menos el nombre, el primer producto, su cantidad y el precio."
+
+    compatible, msg_compat = validar_compatibilidad_promocion([fproducto, sproducto, tproducto])
+    if not compatible:
+        return False, msg_compat
 
     conexion = None
     cursor = None

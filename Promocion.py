@@ -299,6 +299,7 @@ class FramePromociones(ctk.CTkFrame):
 
     def cancelar(self):
         self.codigos_promo.clear()
+        self.productos_promo.clear()
         self.nombrebox.delete(0, END)
         self.preciobox.delete(0, END)
 
@@ -350,15 +351,25 @@ class FramePromociones(ctk.CTkFrame):
             messagebox.showerror("Error", mensaje)
 
     def buscar(self):
-        """Asigna secuencialmente hasta 3 productos y desbloquea su campo de cantidad"""
+        """Asigna secuencialmente hasta 3 productos compatibles y desbloquea su campo de cantidad"""
         if self.tproductobox.get().strip():
             messagebox.showinfo("Límite alcanzado", "Ya seleccionaste los 3 productos permitidos para la promoción.")
             return
 
         def al_elegir(codigo):
             prod = obtener_detalle_producto(codigo)
-            texto_mostrar = f"{codigo} - {prod['nombre']}" if prod else str(codigo)
+            if not prod:
+                messagebox.showerror("Error", "No se pudo obtener la información del producto.")
+                return
+
+            compatible, motivo = self.es_producto_compatible(prod)
+            if not compatible:
+                messagebox.showwarning("Producto incompatible", motivo)
+                return
+
+            texto_mostrar = f"{codigo} - {prod['nombre']}"
             self.codigos_promo.append(codigo)
+            self.productos_promo.append(prod)
 
             if not self.fproductobox.get().strip():
                 self.fproductobox.configure(state="normal")
@@ -566,3 +577,36 @@ class FramePromociones(ctk.CTkFrame):
             self.cargar_promociones()
         else:
             messagebox.showerror("Error", mensaje)
+
+    def es_producto_compatible(self, prod):
+        """Valida si un producto puede agregarse a la promoción actual"""
+        clave_nueva = prod.get("codigo") or prod.get("codigobarras")
+        for existente in self.productos_promo:
+            clave_ex = existente.get("codigo") or existente.get("codigobarras")
+            if clave_nueva and clave_nueva == clave_ex:
+                return False, (
+                    f"El producto '{prod['nombre']}' ya fue agregado a esta promoción.\n"
+                    "Si desea incluir más unidades, modifique su campo Cantidad."
+                )
+
+        requisito = str(prod.get("requisito") or "Ninguno").strip()
+        categoria = str(prod.get("categoria") or "Sin limitaciones").strip()
+
+        if requisito in ("Receta", "Identificación") or categoria == "Limitado":
+            return False, (
+                f"No se puede agregar '{prod['nombre']}' porque tiene restricción de venta "
+                f"(Requisito: {requisito} | Categoría: {categoria}).\n\n"
+                "Las promociones solo permiten productos compatibles sin limitaciones."
+            )
+
+        if self.productos_promo:
+            base = self.productos_promo[0]
+            req_base = str(base.get("requisito") or "Ninguno").strip()
+            cat_base = str(base.get("categoria") or "Sin limitaciones").strip()
+            if requisito != req_base or categoria != cat_base:
+                return False, (
+                    f"'{prod['nombre']}' ({requisito} / {categoria}) no es compatible con "
+                    f"'{base['nombre']}' ({req_base} / {cat_base})."
+                )
+
+        return True, ""
