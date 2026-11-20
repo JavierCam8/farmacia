@@ -3,6 +3,7 @@ import customtkinter as ctk
 import tkinter as tk
 from tkinter import messagebox, END
 from Busquda import VentanaBusqueda, VentanaBusquedaProveedor
+from Faltantes import FrameFaltantes
 from enviarcorreo import enviar_correo
 from Conexion import guardarprovedor, guardarproducto, buscarprovedor, obtener_proveedores, actualizarprovedor, obtener_productos, buscarproducto_nombre, actualizarproducto, buscar_producto_por_codigo
 

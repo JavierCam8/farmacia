@@ -1,8 +1,10 @@
+import os
+import re
 import customtkinter as ctk
 from tkinter import messagebox, END
 from Busquda import VentanaBusqueda, VentanaBusquedaProveedor
 from ListaFaltantes import listafaltantes
-from Conexion import buscar_producto_por_codigo, obtener_producto_de_proveedor, obtener_nombre_proveedor
+from Conexion import buscar_producto_por_codigo, obtener_producto_de_proveedor, obtener_nombre_proveedor, buscarprovedor
 
 class FrameFaltantes(ctk.CTkFrame):
     def __init__(self, parent):
@@ -418,3 +420,66 @@ class FrameFaltantes(ctk.CTkFrame):
             messagebox.showinfo("Éxito", f"Lista de faltantes guardada para {nombre_prov}.")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo generar el archivo de faltantes: {e}")
+
+    def cargar_desde_txt(self, ruta_archivo):
+        """Lee un archivo .txt de faltantes, asigna el proveedor y despliega los productos en la tabla"""
+        if not os.path.exists(ruta_archivo):
+            return
+
+        nombre_prov = ""
+        productos_cargados = []
+
+        try:
+            with open(ruta_archivo, "r", encoding="utf-8") as f:
+                for linea in f:
+                    texto = linea.strip()
+                    if not texto or texto.startswith(("=", "-", "Fecha:", "Total")):
+                        continue
+
+                    if texto.startswith("Proveedor:"):
+                        nombre_prov = texto.replace("Proveedor:", "").strip()
+                        continue
+
+                    # Omitir encabezados de columna
+                    if texto.lower().startswith(("código", "codigo")) and ("cantidad" in texto.lower() or "detalles" in texto.lower()):
+                        continue
+
+                    # Parsear líneas separadas por '|' o tabulador
+                    separador = "|" if "|" in texto else ("\t" if "\t" in texto else None)
+                    if separador:
+                        partes = [p.strip() for p in texto.split(separador) if p.strip()]
+                        if len(partes) >= 3:
+                            cod = re.sub(r"^(Código|Codigo):\s*", "", partes[0], flags=re.IGNORECASE)
+                            p1 = re.sub(r"^Cantidad:\s*", "", partes[1], flags=re.IGNORECASE)
+                            p2 = re.sub(r"^Detalles:\s*", "", partes[2], flags=re.IGNORECASE)
+
+                            if p1.isdigit():
+                                cant, det = int(p1), p2
+                            elif p2.isdigit():
+                                det, cant = p1, int(p2)
+                            else:
+                                cant, det = 1, f"{p1} - {p2}"
+
+                            productos_cargados.append({
+                                "codigo": cod,
+                                "cantidad": cant,
+                                "detalles": det
+                            })
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo leer la lista de faltantes: {e}")
+            return
+
+        if not nombre_prov:
+            nombre_prov = os.path.basename(ruta_archivo).replace("Faltantes_", "").replace(".txt", "")
+
+        # Buscar el ID del proveedor en MySQL para rellenar el campo ID / Proveedor
+        datos_prov = buscarprovedor(nombre_prov)
+        self.blprovedorbox.delete(0, END)
+        if datos_prov:
+            self.blprovedorbox.insert(0, str(datos_prov["id"]))
+            self.nombre_proveedor = datos_prov["nombre"]
+        else:
+            self.nombre_proveedor = nombre_prov
+
+        self.lista_productos = productos_cargados
+        self.renderizar_tabla()
