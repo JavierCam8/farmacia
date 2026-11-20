@@ -4,8 +4,8 @@ from email.message import EmailMessage
 
 
 def enviar_correo(destinatario, asunto, cuerpo, ruta_adjunto=None):
-    remitente = "tu_correo@gmail.com"
-    password_app = "xxxx xxxx xxxx xxxx"  # Contraseña de aplicación de 16 letras
+    remitente = "correopuebas1@gmail.com"
+    password_app = "Prueba.123"  # Contraseña de aplicación de 16 letras
 
     msg = EmailMessage()
     msg["From"] = remitente

@@ -1034,7 +1034,6 @@ def obtener_promociones_completas():
             LEFT JOIN productos p1 ON (pr.fproducto = p1.codigo OR pr.fproducto = p1.codigobarras)
             LEFT JOIN productos p2 ON (pr.sproducto = p2.codigo OR pr.sproducto = p2.codigobarras)
             LEFT JOIN productos p3 ON (pr.tproducto = p3.codigo OR pr.tproducto = p3.codigobarras)
-            GROUP BY pr.id
             ORDER BY pr.id DESC
         """
         cursor.execute(sql)
