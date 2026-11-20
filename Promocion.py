@@ -4,8 +4,9 @@ from Busquda import VentanaBusqueda
 from Conexion import (
     obtener_detalle_producto,
     guardarpromocion,
-    obtener_promociones,
-    cambiar_estado_promocion
+    obtener_promociones_completas,
+    cambiar_estado_promocion,
+    eliminarpromocion,
 )
 
 
@@ -19,12 +20,12 @@ class FramePromociones(ctk.CTkFrame):
         self.contenedor = ctk.CTkFrame(self, fg_color="transparent")
         self.contenedor.pack(fill="both", expand=True, padx=15, pady=10)
 
+        # ====================================================
+        # COLUMNA IZQUIERDA: FORMULARIO DE NUEVA PROMOCIÓN
+        # ====================================================
         self.izquierda = ctk.CTkFrame(self.contenedor)
         self.izquierda.pack(side="left", fill="both", expand=True, padx=(0, 10))
 
-        self.derecha = ctk.CTkFrame(self.contenedor)
-        self.derecha.pack(side="right", fill="both", expand=True, padx=(10, 0))
-        
         self.nuevos = ctk.CTkLabel(
             self.izquierda,
             text="Agregar una nueva promoción",
@@ -148,34 +149,152 @@ class FramePromociones(ctk.CTkFrame):
         )
         self.btncancelar.pack(pady=4)
 
-        #######################################################
-        # CONTROL DE PROMOCIONES (BLOQUE INFERIOR)
-        #######################################################
-        self.snombre = ctk.CTkLabel(
+        # ====================================================
+        # COLUMNA DERECHA: PANEL DE GESTIÓN Y VISTA PREVIA
+        # ====================================================
+        self.derecha = ctk.CTkFrame(self.contenedor)
+        self.derecha.pack(side="right", fill="both", expand=True, padx=(10, 0))
+
+        self.titulo_derecha = ctk.CTkLabel(
             self.derecha,
-            text="Control de promociones:",
-            font=("Arial", 14, "bold")
+            text="Administración de Promociones",
+            font=("Arial", 18, "bold")
         )
-        self.snombre.pack(side="left", padx=(15, 10), pady=15)
+        self.titulo_derecha.pack(pady=(12, 8))
+
+        # 1. TARJETAS DE CONTADORES SUPERIORES (3 columnas)
+        self.frame_kpis = ctk.CTkFrame(self.derecha, fg_color="transparent")
+        self.frame_kpis.pack(fill="x", padx=15, pady=(0, 10))
+        self.frame_kpis.grid_columnconfigure((0, 1, 2), weight=1)
+
+        self.lbl_total_promos = self.crear_kpi(self.frame_kpis, 0, "Total Registradas", "0", "#3B82F6")
+        self.lbl_activas_promos = self.crear_kpi(self.frame_kpis, 1, "Promociones Activas", "0", "#10B981")
+        self.lbl_inactivas_promos = self.crear_kpi(self.frame_kpis, 2, "Desactivadas", "0", "#EF4444")
+
+        # 2. BARRA DE CONTROL DE PROMOCIONES (Selector + Switch + Eliminar)
+        self.card_control = ctk.CTkFrame(self.derecha, fg_color="#2B2B2B", corner_radius=10)
+        self.card_control.pack(fill="x", padx=15, pady=(0, 10))
+
+        self.snombre = ctk.CTkLabel(
+            self.card_control,
+            text="Control de promociones:",
+            font=("Arial", 13, "bold")
+        )
+        self.snombre.pack(side="left", padx=(12, 8), pady=12)
 
         self.combobox = ctk.CTkComboBox(
-            self.derecha,
-            values=[],
-            width=240,
+            self.card_control,
+            values=["Sin promociones"],
+            width=210,
             state="readonly",
             command=self.al_seleccionar_promo
         )
-        self.combobox.pack(side="left", padx=10, pady=15)
+        self.combobox.pack(side="left", padx=6, pady=12)
 
         self.switch_activo = ctk.CTkSwitch(
-            self.derecha,
+            self.card_control,
             text="Desactivada",
             font=("Arial", 12, "bold"),
             state="disabled",
             command=self.alternar_estado_promo
         )
-        self.switch_activo.pack(side="left", padx=15, pady=15)
+        self.switch_activo.pack(side="left", padx=10, pady=12)
 
+        self.btn_eliminar = ctk.CTkButton(
+            self.card_control,
+            text="Eliminar",
+            width=90,
+            height=30,
+            fg_color="#DC2626",
+            hover_color="#991B1B",
+            font=("Arial", 12, "bold"),
+            state="disabled",
+            command=self.eliminar_promo_actual
+        )
+        self.btn_eliminar.pack(side="right", padx=12, pady=12)
+
+        # 3. TARJETA DE VISTA PREVIA Y CÁLCULO DE AHORRO
+        self.card_detalle = ctk.CTkFrame(self.derecha, fg_color="#2B2B2B", corner_radius=10)
+        self.card_detalle.pack(fill="x", padx=15, pady=(0, 10))
+
+        self.lbl_detalle_titulo = ctk.CTkLabel(
+            self.card_detalle,
+            text="Detalle y Ahorro del Paquete",
+            font=("Arial", 13, "bold"),
+            text_color="#60A5FA"
+        )
+        self.lbl_detalle_titulo.pack(anchor="w", padx=12, pady=(8, 4))
+
+        self.lbl_detalle_productos = ctk.CTkLabel(
+            self.card_detalle,
+            text="Seleccione una promoción de la lista o del menú superior para ver su contenido.",
+            font=("Arial", 12),
+            text_color="#D4D4D8",
+            justify="left"
+        )
+        self.lbl_detalle_productos.pack(anchor="w", padx=12, pady=(0, 6))
+
+        self.frame_precios_detalle = ctk.CTkFrame(self.card_detalle, fg_color="#232323", corner_radius=6)
+        self.frame_precios_detalle.pack(fill="x", padx=12, pady=(0, 10))
+
+        self.lbl_precio_regular = ctk.CTkLabel(
+            self.frame_precios_detalle,
+            text="Precio regular: $0.00",
+            font=("Arial", 12, "bold"),
+            text_color="#A1A1AA"
+        )
+        self.lbl_precio_regular.pack(side="left", padx=12, pady=6)
+
+        self.lbl_precio_promo = ctk.CTkLabel(
+            self.frame_precios_detalle,
+            text="Precio promo: $0.00",
+            font=("Arial", 12, "bold"),
+            text_color="#FFFFFF"
+        )
+        self.lbl_precio_promo.pack(side="left", padx=15, pady=6)
+
+        self.lbl_ahorro_promo = ctk.CTkLabel(
+            self.frame_precios_detalle,
+            text="Ahorro: $0.00",
+            font=("Arial", 12, "bold"),
+            text_color="#4ADE80"
+        )
+        self.lbl_ahorro_promo.pack(side="right", padx=12, pady=6)
+
+        # 4. TABLA GENERAL DE PROMOCIONES REGISTRADAS
+        self.card_tabla = ctk.CTkFrame(self.derecha, fg_color="#2B2B2B", corner_radius=10)
+        self.card_tabla.pack(fill="both", expand=True, padx=15, pady=(0, 12))
+
+        self.header_tabla = ctk.CTkFrame(self.card_tabla, fg_color="#1F2937", corner_radius=6)
+        self.header_tabla.pack(fill="x", padx=10, pady=(10, 4))
+
+        ctk.CTkLabel(self.header_tabla, text="Promoción", font=("Arial", 12, "bold"), width=140, anchor="w").pack(side="left", padx=8, pady=5)
+        ctk.CTkLabel(self.header_tabla, text="Productos incluidos", font=("Arial", 12, "bold"), anchor="w").pack(side="left", fill="x", expand=True, padx=5, pady=5)
+        ctk.CTkLabel(self.header_tabla, text="Precio", font=("Arial", 12, "bold"), width=80, anchor="e").pack(side="left", padx=8, pady=5)
+        ctk.CTkLabel(self.header_tabla, text="Estado", font=("Arial", 12, "bold"), width=90, anchor="center").pack(side="left", padx=8, pady=5)
+
+        self.lista_promociones = ctk.CTkScrollableFrame(self.card_tabla, fg_color="transparent")
+        self.lista_promociones.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+
+        self.cargar_promociones()
+
+    def crear_kpi(self, parent, col, titulo, valor, color):
+        card = ctk.CTkFrame(parent, fg_color="#2B2B2B", corner_radius=8)
+        card.grid(row=0, column=col, sticky="nsew", padx=4)
+
+        borde = ctk.CTkFrame(card, width=4, fg_color=color, corner_radius=3)
+        borde.pack(side="left", fill="y", padx=(6, 8), pady=8)
+
+        info = ctk.CTkFrame(card, fg_color="transparent")
+        info.pack(side="left", fill="both", expand=True, pady=6, padx=(0, 6))
+
+        ctk.CTkLabel(info, text=titulo, font=("Arial", 11, "bold"), text_color="#A1A1AA").pack(anchor="w")
+        lbl_val = ctk.CTkLabel(info, text=valor, font=("Arial", 18, "bold"), text_color="#FFFFFF")
+        lbl_val.pack(anchor="w")
+        return lbl_val
+
+    def refrescar_listas(self):
+        """Actualiza automáticamente el panel al volver a entrar desde el menú"""
         self.cargar_promociones()
 
     def cancelar(self):
@@ -271,9 +390,39 @@ class FramePromociones(ctk.CTkFrame):
 
         VentanaBusqueda(self, al_seleccionar_callback=al_elegir, modo="ventas")
 
+    def obtener_resumen_paquete(self, promo):
+        """Arma la lista legible de productos y calcula el precio regular del paquete"""
+        partes = []
+        precio_regular = 0.0
+
+        slots = [
+            (promo.get("fproducto"), promo.get("fcantidad"), promo.get("nombre_p1"), promo.get("precio_p1")),
+            (promo.get("sproducto"), promo.get("scantidad"), promo.get("nombre_p2"), promo.get("precio_p2")),
+            (promo.get("tproducto"), promo.get("tcantidad"), promo.get("nombre_p3"), promo.get("precio_p3")),
+        ]
+
+        for cod, cant, nom, p_unit in slots:
+            if cod and cant:
+                cant_int = int(cant)
+                etiqueta = nom if nom else str(cod)
+                partes.append(f"{cant_int}x {etiqueta}")
+                precio_regular += cant_int * float(p_unit or 0)
+
+        return " + ".join(partes) if partes else "Sin productos", precio_regular
+
+    def actualizar_kpis(self):
+        total = len(self.mapa_promociones)
+        activas = sum(1 for p in self.mapa_promociones.values() if p.get("activo") == 1)
+        inactivas = total - activas
+
+        self.lbl_total_promos.configure(text=str(total))
+        self.lbl_activas_promos.configure(text=str(activas))
+        self.lbl_inactivas_promos.configure(text=str(inactivas))
+
     def cargar_promociones(self):
-        """Consulta MySQL y llena el ComboBox con los nombres de las promociones"""
-        promos = obtener_promociones()
+        """Consulta MySQL, actualiza contadores, ComboBox y tabla general"""
+        seleccion_previa = self.combobox.get()
+        promos = obtener_promociones_completas()
         self.mapa_promociones.clear()
 
         nombres = []
@@ -282,29 +431,106 @@ class FramePromociones(ctk.CTkFrame):
             self.mapa_promociones[nombre] = p
             nombres.append(nombre)
 
+        self.actualizar_kpis()
+        self.renderizar_tabla_promociones(promos)
+
         if nombres:
             self.combobox.configure(values=nombres)
-            self.combobox.set("Selecciona una promoción")
+            if seleccion_previa in self.mapa_promociones:
+                self.combobox.set(seleccion_previa)
+                self.al_seleccionar_promo(seleccion_previa)
+            else:
+                self.combobox.set("Selecciona una promoción")
+                self.limpiar_detalle()
         else:
             self.combobox.configure(values=["Sin promociones"])
             self.combobox.set("Sin promociones")
+            self.limpiar_detalle()
 
+    def limpiar_detalle(self):
         self.switch_activo.deselect()
         self.switch_activo.configure(text="Desactivada", state="disabled")
+        self.btn_eliminar.configure(state="disabled")
+        self.lbl_detalle_productos.configure(
+            text="Seleccione una promoción de la lista o del menú superior para ver su contenido."
+        )
+        self.lbl_precio_regular.configure(text="Precio regular: $0.00")
+        self.lbl_precio_promo.configure(text="Precio promo: $0.00")
+        self.lbl_ahorro_promo.configure(text="Ahorro: $0.00", text_color="#4ADE80")
 
     def al_seleccionar_promo(self, nombre_elegido):
-        """Sincroniza el switch cuando eliges una promoción en el ComboBox"""
+        """Sincroniza el switch, botón eliminar y tarjeta de ahorro al elegir una promoción"""
         promo = self.mapa_promociones.get(nombre_elegido)
         if not promo:
             return
 
+        self.combobox.set(nombre_elegido)
         self.switch_activo.configure(state="normal")
+        self.btn_eliminar.configure(state="normal")
+
         if promo["activo"] == 1:
             self.switch_activo.select()
             self.switch_activo.configure(text="Activa")
         else:
             self.switch_activo.deselect()
             self.switch_activo.configure(text="Desactivada")
+
+        resumen, precio_regular = self.obtener_resumen_paquete(promo)
+        precio_promo = float(promo.get("precio") or 0)
+        ahorro = precio_regular - precio_promo
+
+        self.lbl_detalle_productos.configure(text=f"Incluye:  {resumen}")
+        self.lbl_precio_regular.configure(text=f"Precio regular: ${precio_regular:,.2f}")
+        self.lbl_precio_promo.configure(text=f"Precio promo: ${precio_promo:,.2f}")
+
+        if ahorro > 0:
+            self.lbl_ahorro_promo.configure(text=f"Ahorro: ${ahorro:,.2f}", text_color="#4ADE80")
+        else:
+            self.lbl_ahorro_promo.configure(text=f"Sin descuento (${ahorro:,.2f})", text_color="#FBBF24")
+
+    def renderizar_tabla_promociones(self, promos):
+        for w in self.lista_promociones.winfo_children():
+            w.destroy()
+
+        if not promos:
+            ctk.CTkLabel(
+                self.lista_promociones,
+                text="Aún no hay promociones registradas.",
+                font=("Arial", 12),
+                text_color="#A1A1AA"
+            ).pack(pady=20)
+            return
+
+        for promo in promos:
+            fila = ctk.CTkFrame(self.lista_promociones, fg_color="#232323", corner_radius=6)
+            fila.pack(fill="x", pady=3, padx=2)
+
+            nombre = promo["nombre"]
+            resumen, _ = self.obtener_resumen_paquete(promo)
+            precio = float(promo.get("precio") or 0)
+            activa = promo.get("activo") == 1
+
+            lbl_nom = ctk.CTkLabel(fila, text=nombre, font=("Arial", 12, "bold"), width=140, anchor="w")
+            lbl_nom.pack(side="left", padx=8, pady=6)
+
+            lbl_res = ctk.CTkLabel(fila, text=resumen, font=("Arial", 11), text_color="#D4D4D8", anchor="w")
+            lbl_res.pack(side="left", fill="x", expand=True, padx=5, pady=6)
+
+            lbl_pre = ctk.CTkLabel(fila, text=f"${precio:,.2f}", font=("Arial", 12, "bold"), width=80, anchor="e")
+            lbl_pre.pack(side="left", padx=8, pady=6)
+
+            lbl_est = ctk.CTkLabel(
+                fila,
+                text="Activa" if activa else "Desactivada",
+                font=("Arial", 11, "bold"),
+                width=90,
+                text_color="#4ADE80" if activa else "#F87171"
+            )
+            lbl_est.pack(side="left", padx=8, pady=6)
+
+            # Permitir seleccionar la promoción al hacer clic en cualquier parte de la fila
+            for widget in (fila, lbl_nom, lbl_res, lbl_pre, lbl_est):
+                widget.bind("<Button-1>", lambda _e, n=nombre: self.al_seleccionar_promo(n))
 
     def alternar_estado_promo(self):
         """Guarda en MySQL el cambio entre Activa (1) y Desactivada (0)"""
@@ -319,5 +545,24 @@ class FramePromociones(ctk.CTkFrame):
         if exito:
             promo["activo"] = nuevo_estado
             self.switch_activo.configure(text="Activa" if nuevo_estado == 1 else "Desactivada")
+            self.actualizar_kpis()
+            self.renderizar_tabla_promociones(list(self.mapa_promociones.values()))
+        else:
+            messagebox.showerror("Error", mensaje)
+
+    def eliminar_promo_actual(self):
+        """Elimina la promoción seleccionada previa confirmación"""
+        nombre_elegido = self.combobox.get()
+        promo = self.mapa_promociones.get(nombre_elegido)
+        if not promo:
+            return
+
+        if not messagebox.askyesno("Confirmar", f"¿Eliminar permanentemente la promoción '{nombre_elegido}'?"):
+            return
+
+        exito, mensaje = eliminarpromocion(promo["id"])
+        if exito:
+            messagebox.showinfo("Eliminada", mensaje)
+            self.cargar_promociones()
         else:
             messagebox.showerror("Error", mensaje)
