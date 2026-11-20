@@ -90,6 +90,339 @@ def guardar(username, nombre, telefono, rfc, direccion, estado, email, password,
         if conexion and conexion.is_connected():
             conexion.close()
 
+def obtener_trabajadores():
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+        cursor.execute("SELECT userid, nombre FROM usuarios ORDER BY nombre ASC")
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"Error al obtener trabajadores: {e}")
+        return []
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
+def buscartrabajador(trabajador):
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+
+        sql_buscar = """SELECT userid, username, nombre, telefono, rfc, email, direccion, estado, rango
+                        FROM usuarios 
+                        WHERE nombre = %s
+                        LIMIT 1"""
+
+        cursor.execute(sql_buscar, (trabajador,))
+        return cursor.fetchone()
+
+    except Exception as e:
+        print(f"Error al buscar trabajador: {e}")
+        return None
+
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
+def buscartrabajador(trabajador):
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+
+        sql_buscar = """SELECT userid, username, nombre, telefono, rfc, email, direccion, estado, rango
+                        FROM usuarios 
+                        WHERE nombre = %s
+                        LIMIT 1"""
+
+        cursor.execute(sql_buscar, (trabajador,))
+        return cursor.fetchone()
+
+    except Exception as e:
+        print(f"Error al buscar trabajador: {e}")
+        return None
+
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
+
+def actualizartrabajador(userid, username, nombre, telefono, rfc, direccion, estado, email, password, rango):
+    """Actualiza los datos de un trabajador; solo reencripta la contraseña si se ingresó una nueva"""
+    if not all([userid, username, nombre, telefono, rfc, direccion, estado, email, rango]):
+        return False, "Por favor complete todos los campos obligatorios."
+
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+
+        # Verificar que el username no esté ocupado por otro usuario
+        cursor.execute(
+            "SELECT userid FROM usuarios WHERE username = %s AND userid != %s",
+            (username, userid)
+        )
+        if cursor.fetchone():
+            return False, "Ese nombre de usuario ya está en uso por otro trabajador."
+
+        if password:
+            sal = bcrypt.gensalt()
+            password_hash = bcrypt.hashpw(password.encode('utf-8'), sal).decode('utf-8')
+            sql_update = """
+                UPDATE usuarios
+                SET username = %s, nombre = %s, telefono = %s, rfc = %s,
+                    direccion = %s, estado = %s, email = %s, password = %s, rango = %s
+                WHERE userid = %s
+            """
+            valores = (username, nombre, telefono, rfc, direccion, estado, email, password_hash, rango, userid)
+        else:
+            sql_update = """
+                UPDATE usuarios
+                SET username = %s, nombre = %s, telefono = %s, rfc = %s,
+                    direccion = %s, estado = %s, email = %s, rango = %s
+                WHERE userid = %s
+            """
+            valores = (username, nombre, telefono, rfc, direccion, estado, email, rango, userid)
+
+        cursor.execute(sql_update, valores)
+        conexion.commit()
+        return True, "Información del trabajador actualizada con éxito."
+
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+        return False, f"Error al actualizar trabajador: {str(e)}"
+
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
+
+def eliminartrabajador(userid):
+    """Elimina un trabajador de la base de datos evitando borrar al último administrador"""
+    if not userid:
+        return False, "No hay ningún trabajador seleccionado."
+
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+
+        cursor.execute("SELECT rango FROM usuarios WHERE userid = %s LIMIT 1", (userid,))
+        usuario = cursor.fetchone()
+        if not usuario:
+            return False, "El trabajador ya no existe en la base de datos."
+
+        if str(usuario["rango"]).lower() == "admin":
+            cursor.execute("SELECT COUNT(*) AS total FROM usuarios WHERE rango = 'admin'")
+            total_admins = cursor.fetchone()["total"]
+            if total_admins <= 1:
+                return False, "No puede despedir al único administrador activo del sistema."
+
+        cursor.execute("DELETE FROM usuarios WHERE userid = %s", (userid,))
+        conexion.commit()
+        return True, "Trabajador dado de baja correctamente."
+
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+        return False, f"Error al eliminar trabajador: {str(e)}"
+
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
+def asegurar_tabla_movimientos():
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS movimientos_inventario (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                codigo VARCHAR(100),
+                tipo ENUM('entrada', 'salida') NOT NULL,
+                cantidad INT NOT NULL,
+                ganancia DECIMAL(10, 2) DEFAULT 0.00,
+                fecha DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conexion.commit()
+    except Exception as e:
+        print(f"Error al verificar tabla movimientos: {e}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
+
+def cambiarstock(codigo, cantidad):
+    if not codigo or cantidad is None:
+        return False, "Rellene los campos"
+
+    conexion = None
+    cursor = None
+
+    try:
+        asegurar_tabla_movimientos()
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+
+        # 1. Consultar el stock actual y precios buscando por código o código de barras
+        sql_verificar = """
+            SELECT stock, precio_costo, precio_venta
+            FROM productos
+            WHERE codigo = %s OR codigobarras = %s
+            LIMIT 1
+        """
+        cursor.execute(sql_verificar, (codigo, codigo))
+        producto = cursor.fetchone()
+
+        if not producto:
+            return False, f"Producto '{codigo}' no encontrado"
+
+        cant_int = int(cantidad)
+        stock_actual = producto["stock"] or 0
+        nuevo_stock = stock_actual + cant_int
+
+        if nuevo_stock < 0:
+            return False, f"Stock insuficiente (disponible: {stock_actual})"
+
+        # 2. Actualizar el stock en la tabla productos
+        sql_update = """
+            UPDATE productos
+            SET stock = %s
+            WHERE codigo = %s OR codigobarras = %s
+        """
+        cursor.execute(sql_update, (nuevo_stock, codigo, codigo))
+
+        # 3. Registrar el movimiento para el panel de Reportes
+        if cant_int > 0:
+            cursor.execute(
+                "INSERT INTO movimientos_inventario (codigo, tipo, cantidad, ganancia) VALUES (%s, 'entrada', %s, 0)",
+                (codigo, cant_int)
+            )
+        elif cant_int < 0:
+            unidades_vendidas = abs(cant_int)
+            costo = float(producto.get("precio_costo") or 0)
+            venta = float(producto.get("precio_venta") or 0)
+            ganancia_op = (venta - costo) * unidades_vendidas
+            cursor.execute(
+                "INSERT INTO movimientos_inventario (codigo, tipo, cantidad, ganancia) VALUES (%s, 'salida', %s, %s)",
+                (codigo, unidades_vendidas, ganancia_op)
+            )
+
+        conexion.commit()
+        return True, f"Stock actualizado a {nuevo_stock}"
+
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+        return False, f"Error de conexión con la base de datos: {str(e)}"
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
+def obtener_datos_reportes():
+    """Obtiene KPIs, datos para la gráfica de ganancias y productos con stock bajo"""
+    asegurar_tabla_movimientos()
+    conexion = None
+    cursor = None
+    datos = {
+        "entrados": 0,
+        "vendidos": 0,
+        "ganancia_total": 0.0,
+        "valor_inventario": 0.0,
+        "grafica": [],
+        "bajo_stock": []
+    }
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+
+        # 1. Totales de entradas y salidas registradas
+        cursor.execute("""
+            SELECT
+                COALESCE(SUM(CASE WHEN tipo = 'entrada' THEN cantidad ELSE 0 END), 0) AS entrados,
+                COALESCE(SUM(CASE WHEN tipo = 'salida' THEN cantidad ELSE 0 END), 0) AS vendidos,
+                COALESCE(SUM(CASE WHEN tipo = 'salida' THEN ganancia ELSE 0 END), 0) AS ganancia_ventas
+            FROM movimientos_inventario
+        """)
+        mov = cursor.fetchone() or {}
+        datos["entrados"] = int(mov.get("entrados") or 0)
+        datos["vendidos"] = int(mov.get("vendidos") or 0)
+
+        # 2. Valor de inventario y ganancia proyectada desde productos
+        cursor.execute("""
+            SELECT
+                COALESCE(SUM(stock), 0) AS stock_total,
+                COALESCE(SUM(stock * precio_costo), 0) AS valor_costo,
+                COALESCE(SUM(stock * (precio_venta - precio_costo)), 0) AS ganancia_potencial
+            FROM productos
+        """)
+        inv = cursor.fetchone() or {}
+        if datos["entrados"] == 0:
+            datos["entrados"] = int(inv.get("stock_total") or 0)
+
+        ganancia_ventas = float(mov.get("ganancia_ventas") or 0)
+        datos["ganancia_total"] = ganancia_ventas if ganancia_ventas > 0 else float(inv.get("ganancia_potencial") or 0)
+        datos["valor_inventario"] = float(inv.get("valor_costo") or 0)
+
+        # 3. Top 6 productos por margen de ganancia para la gráfica
+        cursor.execute("""
+            SELECT nombre,
+                   COALESCE(precio_costo, 0) AS costo,
+                   COALESCE(precio_venta, 0) AS venta,
+                   COALESCE(precio_venta - precio_costo, 0) AS ganancia
+            FROM productos
+            ORDER BY ganancia DESC
+            LIMIT 6
+        """)
+        datos["grafica"] = cursor.fetchall()
+
+        # 4. Productos con stock bajo (<= 5)
+        cursor.execute("""
+            SELECT COALESCE(codigo, codigobarras, '-') AS codigo,
+                   nombre,
+                   COALESCE(stock, 0) AS stock
+            FROM productos
+            WHERE COALESCE(stock, 0) <= 5
+            ORDER BY stock ASC
+            LIMIT 15
+        """)
+        datos["bajo_stock"] = cursor.fetchall()
+
+        return datos
+    except Exception as e:
+        print(f"Error al obtener reportes: {e}")
+        return datos
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
 ######################## PROVEEDORES ########################
 
 def guardarprovedor(nombre, telefono, rfc, email, direccion, estado):
@@ -750,6 +1083,64 @@ def obtener_email_proveedor(id_proveedor):
     except Exception as e:
         print(f"Error al obtener correo del proveedor: {e}")
         return None
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
+def obtener_promociones_completas():
+    """Devuelve todas las promociones junto con los nombres y precios regulares de sus productos"""
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+        sql = """
+            SELECT pr.id, pr.nombre,
+                   pr.fproducto, pr.fcantidad,
+                   pr.sproducto, pr.scantidad,
+                   pr.tproducto, pr.tcantidad,
+                   pr.precio, pr.activo,
+                   p1.nombre AS nombre_p1, COALESCE(p1.precio_venta, 0) AS precio_p1,
+                   p2.nombre AS nombre_p2, COALESCE(p2.precio_venta, 0) AS precio_p2,
+                   p3.nombre AS nombre_p3, COALESCE(p3.precio_venta, 0) AS precio_p3
+            FROM promocion pr
+            LEFT JOIN productos p1 ON (pr.fproducto = p1.codigo OR pr.fproducto = p1.codigobarras)
+            LEFT JOIN productos p2 ON (pr.sproducto = p2.codigo OR pr.sproducto = p2.codigobarras)
+            LEFT JOIN productos p3 ON (pr.tproducto = p3.codigo OR pr.tproducto = p3.codigobarras)
+            GROUP BY pr.id
+            ORDER BY pr.id DESC
+        """
+        cursor.execute(sql)
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"Error al obtener promociones completas: {e}")
+        return []
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
+
+def eliminarpromocion(promo_id):
+    """Elimina una promoción de la base de datos por su ID"""
+    if not promo_id:
+        return False, "Seleccione una promoción válida."
+
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor()
+        cursor.execute("DELETE FROM promocion WHERE id = %s", (promo_id,))
+        conexion.commit()
+        return True, "Promoción eliminada correctamente."
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+        return False, f"Error al eliminar promoción: {e}"
     finally:
         if cursor:
             cursor.close()
