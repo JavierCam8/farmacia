@@ -15,7 +15,7 @@ class FrameVentas(ctk.CTkFrame):
         self.lista_productos = []
         self.notas_guardadas=[]
         self.folio_actual=1
-        totalprecio=0.00
+        self.producto_actual = None
 
         self.contenedor = ctk.CTkFrame(self, fg_color="transparent")
         self.contenedor.pack(fill="both", expand=True, padx=15, pady=10)
@@ -240,6 +240,7 @@ class FrameVentas(ctk.CTkFrame):
             command=self.subir
         )
         self.btsubir.pack(side="left", padx=3)
+        self.btsubir.configure(state="disabled")
 
         self.btcancelar = ctk.CTkButton(
             self.f_btns,
@@ -443,9 +444,14 @@ class FrameVentas(ctk.CTkFrame):
 
         # Atajos en cajas de captura
         self.blcodigobox.bind("<Return>", self.enter)
+        self.blcodigobox.bind("<Key>", lambda e: self.btsubir.configure(state="disabled") if e.keysym != "Return" else None)
         self.blcantidadbox.bind("<Return>", self.enter)
 
-        # Teclas de función (F1 - F9)
+       # Atajos en cajas de captura
+        self.blcodigobox.bind("<Return>", self.enter)
+        self.blcantidadbox.bind("<Return>", self.enter)
+        self.blcodigobox.bind("<Key>", lambda e: self.btsubir.configure(state="disabled") if e.keysym != "Return" else None)
+        self.blcantidadbox.bind("<Key>", lambda e: self.btsubir.configure(state="disabled") if e.keysym != "Return" else None)
        # Teclas de función (F1 - F9) en la ventana principal mientras Ventas esté visible
         ventana = self.winfo_toplevel()
         ventana.bind("<F1>", lambda e: self.busquedacodigo() if self.winfo_ismapped() else None, add="+")
@@ -459,6 +465,7 @@ class FrameVentas(ctk.CTkFrame):
         ventana.bind("<F9>", lambda e: self.facturar() if (self.winfo_ismapped() and self.f9.cget("state") == "normal") else None, add="+")
 
     def cancelar(self):
+        self.producto_actual = None
         self.blcodigobox.delete(0, END)
         self.blcantidadbox.delete(0, END)
         self.blpreciobox.configure(state="normal")
@@ -470,18 +477,19 @@ class FrameVentas(ctk.CTkFrame):
         self.bldetallesbox.configure(state="normal")
         self.bldetallesbox.delete(0, END)
         self.bldetallesbox.configure(state="disabled")
+
+        self.btsubir.configure(state="disabled")
         self.blcodigobox.focus()
 
     def enter(self, event=None):
         codigo = self.blcodigobox.get().strip()
-
         if not codigo:
             return
 
         try:
             cantidad = int(self.blcantidadbox.get().strip())
             if cantidad <= 0:
-                messagebox.showerror("Error", "No se permiten cantidades negativas o cero")
+                messagebox.showerror("Error", "No se permiten cantidades negativas o cero.")
                 return
         except ValueError:
             cantidad = 1
@@ -490,17 +498,42 @@ class FrameVentas(ctk.CTkFrame):
 
         producto = buscar_producto_por_codigo(codigo)
         if not producto:
-            messagebox.showerror("Error", "Producto no encontrado")
+            messagebox.showerror("Error", "Producto no encontrado.")
             return
 
+        # 1. Validar incompatibilidad entre categoría "Limitado" y requisito "Receta"
+        req_nuevo = (producto.get("requisito") or "").strip().lower()
+        cat_nuevo = (producto.get("categoria") or "").strip().lower()
+
+        tiene_receta = any((p.get("requisito") or "").strip().lower() == "receta" for p in self.lista_productos)
+        tiene_limitado = any((p.get("categoria") or "").strip().lower() == "limitado" for p in self.lista_productos)
+
+        if (cat_nuevo == "limitado" and tiene_receta) or (req_nuevo == "receta" and tiene_limitado):
+            messagebox.showwarning(
+                "Combinación no permitida",
+                "No se pueden mezclar productos de categoría 'Limitado' con artículos de 'Receta' en la misma nota.\n\nCobre por separado o guarde esta nota con F5."
+            )
+            self.cancelar()
+            return
+
+        # 2. Validar stock sumando lo que ya esté agregado en la tabla actual
         infostock = revisar_stock(codigo)
         if infostock is None:
-            messagebox.showerror("Error", "No se pudo obtener información de stock")
-            return
-        if cantidad > infostock:
-            messagebox.showerror("Error", f"Cantidad excede el stock disponible ({infostock})")
+            messagebox.showerror("Error", "No se pudo obtener información de stock.")
             return
 
+        codigos_prod = {str(producto.get("codigo") or ""), str(producto.get("codigobarras") or ""), codigo}
+        en_carrito = sum(p["cantidad"] for p in self.lista_productos if str(p["codigo"]) in codigos_prod)
+
+        if (cantidad + en_carrito) > infostock:
+            disponible = max(0, infostock - en_carrito)
+            messagebox.showerror(
+                "Stock insuficiente",
+                f"Stock disponible: {infostock} (ya tienes {en_carrito} en esta nota; puedes agregar máximo {disponible})."
+            )
+            return
+
+        self.producto_actual = producto
         nombre = producto["nombre"]
         precio = float(producto.get("precio_venta") or 0)
         total = precio * cantidad
@@ -521,35 +554,53 @@ class FrameVentas(ctk.CTkFrame):
         texto_detalles = f"{nombre} - {detalles}" if detalles else nombre
         self.bldetallesbox.insert(0, texto_detalles)
         self.bldetallesbox.configure(state="disabled")
+
+        self.btsubir.configure(state="normal")
         
     def subir(self):
-        """Agrega un producto validado a la lista en memoria y actualiza la tabla"""
+        """Agrega un producto validado a la lista en memoria y vuelve a bloquear el botón"""
         codigo = self.blcodigobox.get().strip()
         detalles = self.bldetallesbox.get().strip()
         precio_str = self.blpreciobox.get().strip()
 
+        if not codigo or not precio_str or not self.producto_actual:
+            messagebox.showwarning("Advertencia", "Primero presione Enter para cargar los datos del producto.")
+            return
+
         try:
             cantidad = int(self.blcantidadbox.get().strip())
+            if cantidad <= 0:
+                messagebox.showerror("Error", "La cantidad debe ser mayor a 0.")
+                return
         except ValueError:
             cantidad = 1
 
-        if not codigo or not precio_str:
-            messagebox.showwarning("Advertencia", "Primero presione Enter para cargar los datos del producto.")
+        # Doble verificación de stock al momento de subir
+        infostock = revisar_stock(codigo)
+        codigos_prod = {
+            str(self.producto_actual.get("codigo") or ""),
+            str(self.producto_actual.get("codigobarras") or ""),
+            codigo
+        }
+        en_carrito = sum(p["cantidad"] for p in self.lista_productos if str(p["codigo"]) in codigos_prod)
+
+        if infostock is not None and (cantidad + en_carrito) > infostock:
+            messagebox.showerror("Stock insuficiente", f"No puedes superar el stock disponible ({infostock}).")
             return
 
         precio_unitario = float(precio_str)
         precio_total_linea = precio_unitario * cantidad
 
-        # Agregar el elemento al carrito en RAM
         self.lista_productos.append({
             "codigo": codigo,
             "cantidad": cantidad,
             "detalles": detalles,
             "precio_unitario": precio_unitario,
-            "precio_total": precio_total_linea
+            "precio_total": precio_total_linea,
+            "requisito": self.producto_actual.get("requisito") or "",
+            "categoria": self.producto_actual.get("categoria") or ""
         })
 
-        # Redibujar la tabla limpia y actualizar montos
         self.renderizar_tabla()
         self.cancelar()
         

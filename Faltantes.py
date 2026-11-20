@@ -241,6 +241,17 @@ class FrameFaltantes(ctk.CTkFrame):
         self.lf4 = ctk.CTkLabel(self.item_f4, text="Subir al sistema", font=("Arial", 12, "bold"))
         self.lf4.pack(side="left")
 
+        # Atajos de teclado
+        self.blprovedorbox.bind("<Return>", lambda e: self.blcodigobox.focus())
+        self.blcodigobox.bind("<Return>", self.enter)
+        self.blcantidadbox.bind("<Return>", self.enter)
+
+        root = self.winfo_toplevel()
+        root.bind("<F1>", lambda e: self.busquedaprovedor() if self.winfo_ismapped() else None, add="+")
+        root.bind("<F2>", lambda e: self.busquedacodigo() if self.winfo_ismapped() else None, add="+")
+        root.bind("<F3>", lambda e: self.borrarproducto() if self.winfo_ismapped() else None, add="+")
+        root.bind("<F4>", lambda e: self.subirsistema() if self.winfo_ismapped() else None, add="+")
+
     # ====================================================
     # LÓGICA DE EVENTOS Y ACCIONES
     # ====================================================
@@ -371,10 +382,11 @@ class FrameFaltantes(ctk.CTkFrame):
 
         nombre = producto.get('nombre') or ''
         descripcion = producto.get('descripcion') or ''
+        texto_detalles = f"{nombre} - {descripcion}" if descripcion else nombre
 
         self.bldetallesbox.configure(state="normal")
         self.bldetallesbox.delete(0, END)
-        self.bldetallesbox.insert(0, f"{nombre} - {descripcion}")
+        self.bldetallesbox.insert(0, texto_detalles)
         self.bldetallesbox.configure(state="disabled")
     
     def subirsistema(self):

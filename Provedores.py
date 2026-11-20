@@ -2,8 +2,9 @@ import os
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import messagebox, END
+from Busquda import VentanaBusqueda, VentanaBusquedaProveedor
 from enviarcorreo import enviar_correo
-from Conexion import guardarprovedor, guardarproducto, buscarprovedor, obtener_proveedores, actualizarprovedor, obtener_productos, buscarproducto_nombre, actualizarproducto
+from Conexion import guardarprovedor, guardarproducto, buscarprovedor, obtener_proveedores, actualizarprovedor, obtener_productos, buscarproducto_nombre, actualizarproducto, buscar_producto_por_codigo
 
 class FrameProvedor(ctk.CTkFrame):
     def __init__(self, parent):
@@ -42,7 +43,7 @@ class FrameProvedor(ctk.CTkFrame):
             font=("Arial", 12, "bold")
         )
         self.bpnombre.pack(pady=3)
-        self.bpnombrebox=ctk.CTkComboBox(self.actualizarprovedor,  values=[""], width=300)
+        self.bpnombrebox=ctk.CTkComboBox(self.actualizarprovedor,  values=[""], width=300, command=self.cargar_datos_proveedor)
         self.bpnombrebox.pack(pady=3)
 
         self.cnombre=ctk.CTkLabel(
@@ -106,7 +107,7 @@ class FrameProvedor(ctk.CTkFrame):
             hover_color="#1D4ED8",
             text_color="#FFFFFF",
             width=300,
-            command=self.buscarprovedor
+            command=self.abrir_busqueda_proveedor
         )
         self.btnbuscar.pack(pady=2)
 
@@ -259,7 +260,7 @@ class FrameProvedor(ctk.CTkFrame):
             hover_color="#1D4ED8",
             text_color="#FFFFFF",
             width=300,
-            command=self.buscar_producto
+            command=self.abrir_busqueda_producto
         )
         self.btnbuscarproducto.pack(pady=2)
 
@@ -753,3 +754,60 @@ class FrameProvedor(ctk.CTkFrame):
         self.provedorfaltantebox.configure(state="normal")
         self.provedorfaltantebox.delete(0, END)
         self.provedorfaltantebox.configure(state="disabled")
+
+    def cargar_datos_proveedor(self, _seleccion=None):
+        """Rellena los campos del proveedor al seleccionarlo en el ComboBox o desde el buscador"""
+        provedor = self.bpnombrebox.get().strip()
+        if not provedor:
+            return
+
+        datos = buscarprovedor(provedor)
+        if not datos:
+            messagebox.showwarning("Sin resultados", "No se encontró el proveedor en la base de datos")
+            return
+
+        self.proveedor_actual_id = datos["id"]
+        self.btcambiar.configure(state="normal")
+
+        self.cnombrebox.delete(0, END)
+        self.cnombrebox.insert(0, datos["nombre"] or "")
+
+        self.ctelefonobox.delete(0, END)
+        self.ctelefonobox.insert(0, datos["telefono"] or "")
+
+        self.crfcbox.delete(0, END)
+        self.crfcbox.insert(0, datos["rfc"] or "")
+
+        self.cemailbox.delete(0, END)
+        self.cemailbox.insert(0, datos["email"] or "")
+
+        self.cdireccionbox.delete(0, END)
+        self.cdireccionbox.insert(0, datos["direccion"] or "")
+
+        self.cestadobox.delete(0, END)
+        self.cestadobox.insert(0, datos["estado"] or "")
+
+    def abrir_busqueda_proveedor(self):
+        """Abre el modal de búsqueda de proveedores y carga sus datos en el formulario"""
+        def al_elegir(prov):
+            nombre_prov = prov.get("nombre", "")
+            if nombre_prov:
+                self.bpnombrebox.set(nombre_prov)
+                self.cargar_datos_proveedor(nombre_prov)
+
+        VentanaBusquedaProveedor(self, al_seleccionar_callback=al_elegir)
+
+    def abrir_busqueda_producto(self):
+        """Abre el modal de búsqueda de productos y carga toda su información en el formulario"""
+        def al_elegir(codigo):
+            producto = buscar_producto_por_codigo(codigo)
+            if not producto:
+                messagebox.showwarning("Sin resultados", "No se encontró el producto seleccionado.")
+                return
+
+            nombre_prod = producto.get("nombre", "")
+            if nombre_prod:
+                self.buscarproducto.set(nombre_prod)
+                self.buscar_producto(nombre_prod)
+
+        VentanaBusqueda(self, al_seleccionar_callback=al_elegir, modo="ventas")

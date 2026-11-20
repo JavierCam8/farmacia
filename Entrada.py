@@ -237,19 +237,20 @@ class FrameEntrada(ctk.CTkFrame):
             self.blcantidadbox.delete(0, END)
             self.blcantidadbox.insert(0, str(cantidad))
 
-        productos = buscar_producto_por_codigo(codigo)
-        if not productos:
+        producto = buscar_producto_por_codigo(codigo)
+        if not producto:
             messagebox.showerror("Error", "Producto no encontrado.")
             return
 
-        nombre = productos['nombre']
-        detalles = productos['detalles']
+        nombre = producto.get("nombre") or ""
+        descripcion = producto.get("descripcion") or ""
+        texto_detalles = f"{nombre} - {descripcion}" if descripcion else nombre
 
         self.bldetallesbox.configure(state="normal")
         self.bldetallesbox.delete(0, END)
-        self.bldetallesbox.insert(0, f"{nombre} - {detalles}")
+        self.bldetallesbox.insert(0, texto_detalles)
         self.bldetallesbox.configure(state="disabled")
-
+        
     def busquedacodigo(self):
         def al_elegir(codigo):
             self.blcodigobox.delete(0, 'end')

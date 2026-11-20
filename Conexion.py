@@ -475,7 +475,7 @@ def buscar_producto_por_codigo(codigo):
         conexion = obtener_conexion()
         cursor = conexion.cursor(dictionary=True)
         sql = """
-            SELECT codigo, codigobarras, nombre, descripcion, precio_venta, stock
+            SELECT codigo, codigobarras, nombre, descripcion, precio_venta, stock, requisito, categoria
             FROM productos
             WHERE codigo = %s OR codigobarras = %s
             LIMIT 1
