@@ -664,9 +664,9 @@ def actualizarproducto(id_producto, marca, nombre, codigobarras, codigo, descrip
             conexion.close()
 ######################## CLIENTES ########################
 
-def guardarcliente(nombre, telefono, rfc, email, direccion, estado, username):
+def guardarcliente(nombre, telefono, rfc, email, direccion, estado, codigo):
     """Registra un nuevo cliente en la base de datos"""
-    if not all([nombre, telefono, rfc, email, direccion, estado, username]):
+    if not all([nombre, telefono, rfc, email, direccion, estado, codigo]):
         return False, "Por favor complete todos los campos."
 
     conexion = None
@@ -675,24 +675,215 @@ def guardarcliente(nombre, telefono, rfc, email, direccion, estado, username):
         conexion = obtener_conexion()
         cursor = conexion.cursor(dictionary=True)
 
-        sql_verificar = "SELECT id FROM clientes WHERE nombre = %s"
-        cursor.execute(sql_verificar, (nombre,))
+        cursor.execute("SELECT id FROM clientes WHERE nombre = %s OR codigo = %s", (nombre, codigo))
         if cursor.fetchone():
-            return False, "El cliente ya está registrado."
+            return False, "El nombre o código del cliente ya está registrado."
 
         sql_insert = """
-            INSERT INTO clientes (nombre, telefono, rfc, email, direccion, estado, username)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO clientes (nombre, codigo, telefono, rfc, estado, direccion, email, puntos, dinerogastado)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 0, 0)
         """
-        valores = (nombre, telefono, rfc, email, direccion, estado, username)
-
+        valores = (nombre, codigo, telefono, rfc, estado, direccion, email)
         cursor.execute(sql_insert, valores)
         conexion.commit()
         return True, "Cliente registrado con éxito."
 
     except Exception as e:
         return False, f"Error de conexión con la base de datos: {str(e)}"
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
 
+
+def obtener_clientes():
+    """Devuelve todos los clientes registrados"""
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT id, nombre, codigo,
+                   COALESCE(puntos, 0) AS puntos,
+                   COALESCE(dinerogastado, 0) AS dinerogastado
+            FROM clientes
+            ORDER BY nombre ASC
+        """)
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"Error al obtener clientes: {e}")
+        return []
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
+
+def buscarcliente_nombre(nombre):
+    """Obtiene todos los datos de un cliente por su nombre"""
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT id, nombre, codigo, telefono, rfc, estado, direccion, email,
+                   COALESCE(puntos, 0) AS puntos,
+                   COALESCE(dinerogastado, 0) AS dinerogastado
+            FROM clientes
+            WHERE nombre = %s
+            LIMIT 1
+        """, (nombre,))
+        return cursor.fetchone()
+    except Exception as e:
+        print(f"Error al buscar cliente: {e}")
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
+
+def actualizarcliente(id_cliente, nombre, telefono, rfc, email, direccion, estado, codigo):
+    """Actualiza los datos de un cliente existente"""
+    if not all([id_cliente, nombre, telefono, rfc, email, direccion, estado, codigo]):
+        return False, "Por favor complete todos los campos."
+
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor()
+        sql_update = """
+            UPDATE clientes
+            SET nombre = %s, codigo = %s, telefono = %s, rfc = %s,
+                estado = %s, direccion = %s, email = %s
+            WHERE id = %s
+        """
+        cursor.execute(sql_update, (nombre, codigo, telefono, rfc, estado, direccion, email, id_cliente))
+        conexion.commit()
+        return True, "Datos del cliente actualizados con éxito."
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+        return False, f"Error al actualizar cliente: {str(e)}"
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
+
+
+def buscar_clientes_coincidentes(criterio):
+    conexion = obtener_conexion()
+    if not conexion:
+        return []
+
+    try:
+        cursor = conexion.cursor(dictionary=True)
+        consulta = """
+            SELECT id, nombre, codigo,
+                   COALESCE(puntos, 0) AS puntos,
+                   COALESCE(dinerogastado, 0) AS dinerogastado
+            FROM clientes
+            WHERE nombre LIKE %s OR CAST(id AS CHAR) LIKE %s OR codigo LIKE %s
+            LIMIT 50
+        """
+        patron = f"%{criterio}%"
+        cursor.execute(consulta, (patron, patron, patron))
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"Error al buscar clientes: {e}")
+        return []
+    finally:
+        cursor.close()
+        conexion.close()
+
+
+def obtener_cliente_por_id(id_cliente=1):
+    conexion = obtener_conexion()
+    if not conexion:
+        return None
+
+    try:
+        cursor = conexion.cursor(dictionary=True)
+        consulta = """
+            SELECT id, nombre, codigo, telefono, rfc, estado, direccion, email,
+                   COALESCE(puntos, 0) AS puntos,
+                   COALESCE(dinerogastado, 0) AS dinerogastado
+            FROM clientes
+            WHERE id = %s
+            LIMIT 1
+        """
+        cursor.execute(consulta, (id_cliente,))
+        return cursor.fetchone()
+    except Exception as e:
+        print(f"Error al obtener cliente: {e}")
+        return None
+    finally:
+        cursor.close()
+        conexion.close()
+
+
+def procesar_puntos_compra(id_cliente, total_compra, canjear=False):
+    """
+    - Ignora al cliente genérico (id = 1).
+    - Si canjear=True, puntos >= 50 y total < 200: resta 50 puntos (compra gratis).
+    - En compra normal: suma el monto a dinerogastado y, si total > 200, suma 5 puntos.
+    """
+    if not id_cliente or int(id_cliente) == 1:
+        return True, "Venta a público general (sin movimiento de puntos).", 0
+
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+
+        cursor.execute(
+            "SELECT COALESCE(puntos, 0) AS puntos, COALESCE(dinerogastado, 0) AS dinerogastado FROM clientes WHERE id = %s LIMIT 1",
+            (id_cliente,)
+        )
+        cliente = cursor.fetchone()
+        if not cliente:
+            return False, "Cliente no encontrado.", 0
+
+        puntos_actuales = int(cliente["puntos"])
+        gasto_actual = int(cliente["dinerogastado"])
+        total = float(total_compra)
+
+        if canjear:
+            if puntos_actuales < 50:
+                return False, "El cliente no cuenta con los 50 puntos necesarios.", puntos_actuales
+            if total >= 200:
+                return False, "El canje gratis solo aplica en compras menores a $200.00.", puntos_actuales
+
+            nuevos_puntos = puntos_actuales - 50
+            cursor.execute("UPDATE clientes SET puntos = %s WHERE id = %s", (nuevos_puntos, id_cliente))
+            conexion.commit()
+            return True, f"Canje aplicado (-50 pts). Puntos restantes: {nuevos_puntos}.", nuevos_puntos
+
+        nuevo_gasto = gasto_actual + int(round(total))
+        nuevos_puntos = puntos_actuales + 5 if total > 200 else puntos_actuales
+
+        cursor.execute(
+            "UPDATE clientes SET puntos = %s, dinerogastado = %s WHERE id = %s",
+            (nuevos_puntos, nuevo_gasto, id_cliente)
+        )
+        conexion.commit()
+
+        if total > 200:
+            return True, f"¡El cliente ganó +5 puntos! Total acumulado: {nuevos_puntos} pts.", nuevos_puntos
+        return True, f"Compra registrada. Puntos actuales: {nuevos_puntos} pts.", nuevos_puntos
+
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+        return False, f"Error al actualizar puntos: {e}", 0
     finally:
         if cursor:
             cursor.close()
@@ -838,21 +1029,22 @@ def buscar_proveedores_coincidentes(criterio):
         return []
 
 def buscar_clientes_coincidentes(criterio):
-    conexion = obtener_conexion()  # Usa el nombre de tu función de conexión en Conexion.py
+    conexion = obtener_conexion()
     if not conexion:
         return []
 
     try:
         cursor = conexion.cursor(dictionary=True)
-        # Ajusta 'clientes', 'id' o 'nombre' si en tu tabla se llaman distinto (ej. id_cliente)
         consulta = """
-            SELECT id, nombre
+            SELECT id, nombre, codigo,
+                   COALESCE(puntos, 0) AS puntos,
+                   COALESCE(dinerogastado, 0) AS dinerogastado
             FROM clientes
-            WHERE nombre LIKE %s OR CAST(id AS CHAR) LIKE %s
+            WHERE nombre LIKE %s OR CAST(id AS CHAR) LIKE %s OR codigo LIKE %s
             LIMIT 50
         """
         patron = f"%{criterio}%"
-        cursor.execute(consulta, (patron, patron))
+        cursor.execute(consulta, (patron, patron, patron))
         return cursor.fetchall()
     except Exception as e:
         print(f"Error al buscar clientes: {e}")
@@ -861,15 +1053,18 @@ def buscar_clientes_coincidentes(criterio):
         cursor.close()
         conexion.close()
 
+
 def obtener_cliente_por_id(id_cliente=1):
-    conexion = obtener_conexion()  # Usa el nombre de tu función de conexión en Conexion.py
+    conexion = obtener_conexion()
     if not conexion:
         return None
 
     try:
         cursor = conexion.cursor(dictionary=True)
         consulta = """
-            SELECT id, nombre, codigo, telefono, rfc, estado, direccion, email
+            SELECT id, nombre, codigo, telefono, rfc, estado, direccion, email,
+                   COALESCE(puntos, 0) AS puntos,
+                   COALESCE(dinerogastado, 0) AS dinerogastado
             FROM clientes
             WHERE id = %s
             LIMIT 1
@@ -877,11 +1072,79 @@ def obtener_cliente_por_id(id_cliente=1):
         cursor.execute(consulta, (id_cliente,))
         return cursor.fetchone()
     except Exception as e:
-        print(f"Error al obtener cliente por defecto: {e}")
+        print(f"Error al obtener cliente: {e}")
         return None
     finally:
         cursor.close()
         conexion.close()
+
+
+def procesar_puntos_compra(id_cliente, total_compra, canjear=False):
+    """
+    Aplica las reglas de puntos y actualiza dinerogastado:
+    - Ignora al cliente genérico (id = 1).
+    - Si canjear=True, puntos >= 50 y total < 200: descuenta 50 puntos y no suma gasto.
+    - En compra normal: suma el monto a dinerogastado y, si total > 200, suma 5 puntos.
+    """
+    if not id_cliente or int(id_cliente) == 1:
+        return True, "Venta a público general (sin movimiento de puntos).", 0
+
+    conexion = None
+    cursor = None
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor(dictionary=True)
+
+        cursor.execute(
+            "SELECT COALESCE(puntos, 0) AS puntos, COALESCE(dinerogastado, 0) AS dinerogastado FROM clientes WHERE id = %s LIMIT 1",
+            (id_cliente,)
+        )
+        cliente = cursor.fetchone()
+        if not cliente:
+            return False, "Cliente no encontrado.", 0
+
+        puntos_actuales = int(cliente["puntos"])
+        gasto_actual = int(cliente["dinerogastado"])
+        total = float(total_compra)
+
+        # 1. Canje de 50 puntos en compra menor a $200
+        if canjear:
+            if puntos_actuales < 50:
+                return False, "El cliente no cuenta con los 50 puntos necesarios.", puntos_actuales
+            if total >= 200:
+                return False, "El canje gratis solo aplica en compras menores a $200.00.", puntos_actuales
+
+            nuevos_puntos = puntos_actuales - 50
+            cursor.execute(
+                "UPDATE clientes SET puntos = %s WHERE id = %s",
+                (nuevos_puntos, id_cliente)
+            )
+            conexion.commit()
+            return True, f"Canje aplicado (-50 pts). Puntos restantes: {nuevos_puntos}.", nuevos_puntos
+
+        # 2. Compra normal: acumula dinerogastado y suma 5 puntos si supera $200
+        nuevo_gasto = gasto_actual + int(round(total))
+        nuevos_puntos = puntos_actuales + 5 if total > 200 else puntos_actuales
+
+        cursor.execute(
+            "UPDATE clientes SET puntos = %s, dinerogastado = %s WHERE id = %s",
+            (nuevos_puntos, nuevo_gasto, id_cliente)
+        )
+        conexion.commit()
+
+        if total > 200:
+            return True, f"¡El cliente ganó +5 puntos! Total acumulado: {nuevos_puntos} pts.", nuevos_puntos
+        return True, f"Compra registrada. Puntos actuales: {nuevos_puntos} pts.", nuevos_puntos
+
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+        return False, f"Error al actualizar puntos: {e}", 0
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion and conexion.is_connected():
+            conexion.close()
 
 ########################################## PROMOCIONES
 

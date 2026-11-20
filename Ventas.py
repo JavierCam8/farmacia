@@ -1,7 +1,7 @@
 import customtkinter as ctk
 import os
 from tkinter import messagebox, END
-from Conexion import buscar_producto_por_codigo, revisar_stock, obtener_cliente_por_id
+from Conexion import buscar_producto_por_codigo, revisar_stock, obtener_cliente_por_id,cambiarstock , procesar_puntos_compra
 from Busquda import VentanaBusqueda, Ventanaborrarproducto, BuscarCliente
 from CambiarPrecio import confirmacion, Cambio_precio
 from Notas import Notanueva, guardar_nota_txt, Buscarnota, Cancelarnota
@@ -63,6 +63,15 @@ class FrameVentas(ctk.CTkFrame):
         self.lfoliobox.place(x=330, y=25)
         self.lfoliobox.insert(0, str(self.folio_actual))
         self.lfoliobox.configure(state="disabled")
+
+        self.lpuntos = ctk.CTkLabel(
+            self.arriba,
+            text="Puntos: N/A",
+            font=("Arial", 13, "bold"),
+            text_color="#A1A1AA"
+        )
+        self.lpuntos.place(relx=0.98, y=25, anchor="ne")
+        self.actualizar_label_puntos()
 
 
         # Contenedor para las 6 columnas
@@ -830,12 +839,53 @@ class FrameVentas(ctk.CTkFrame):
         Notanueva(self, al_confirmar_callback=guardar_y_generar_nueva)
 
     def pagar(self):
-        if self.lista_productos==[]:
+        if not self.lista_productos:
             messagebox.showwarning("Advertencia", "No hay productos registrados")
             return
+
+        total_venta = self.obtener_total_venta()
+        cliente_id = int(self.cliente_seleccionado.get("id", 1))
+        puntos_cliente = int(self.cliente_seleccionado.get("puntos") or 0)
+
+        # Verificar si el cliente registrado tiene >= 50 puntos y la compra es menor a $200.00
+        if cliente_id != 1 and puntos_cliente >= 50 and 0 < total_venta < 200:
+            usar_puntos = messagebox.askyesno(
+                "Canje de Puntos Disponible",
+                f"El cliente '{self.cliente_seleccionado.get('nombre')}' tiene {puntos_cliente} puntos.\n\n"
+                f"Total de esta compra: ${total_venta:.2f} (menor a $200.00).\n"
+                "¿Desea canjear 50 puntos para que esta compra sea GRATIS?"
+            )
+            if usar_puntos:
+                exito, msg_canje, nuevos_pts = procesar_puntos_compra(cliente_id, total_venta, canjear=True)
+                if not exito:
+                    messagebox.showerror("Error en canje", msg_canje)
+                    return
+
+                # Descontar stock de los productos entregados en el canje
+                for item in self.lista_productos:
+                    cambiarstock(item["codigo"], -int(item["cantidad"]))
+
+                self.cliente_seleccionado["puntos"] = nuevos_pts
+                self.actualizar_label_puntos()
+                self.f9.configure(state="normal")
+                messagebox.showinfo(
+                    "Compra Gratis Canjeada",
+                    f"{msg_canje}\n\nEl cobro fue $0.00. Ya puede facturar con F9."
+                )
+                return
+
         def pagar_registro():
             self.f9.configure(state="normal")
+            if cliente_id != 1:
+                exito, msg_pts, nuevos_pts = procesar_puntos_compra(cliente_id, total_venta, canjear=False)
+                if exito:
+                    self.cliente_seleccionado["puntos"] = nuevos_pts
+                    self.actualizar_label_puntos()
+                    messagebox.showinfo("Pago", f"Pago registrado. Ya puede facturar con F9.\n\n{msg_pts}")
+                    return
+
             messagebox.showinfo("Pago", "Pago registrado. Ya puede facturar con F9.")
+
         pagar(self, callback=pagar_registro)
 
     def buscarnota(self):
@@ -904,7 +954,7 @@ class FrameVentas(ctk.CTkFrame):
         """Carga desde la BD el cliente base (id=1: publico general) y lo muestra en pantalla"""
         cliente_base = obtener_cliente_por_id(1)
         if not cliente_base:
-            cliente_base = {"id": 1, "nombre": "publico general"}
+            cliente_base = {"id": 1, "nombre": "publico general", "puntos": 0}
 
         self.cliente_seleccionado = cliente_base
 
@@ -912,16 +962,43 @@ class FrameVentas(ctk.CTkFrame):
         self.lclientebox.delete(0, END)
         self.lclientebox.insert(0, cliente_base["nombre"])
         self.lclientebox.configure(state="disabled")
+        self.actualizar_label_puntos()
 
     def cliente(self):
         """Abre el buscador de clientes y asigna el elegido a la nota (Tecla F4)"""
         def al_elegir_cliente(datos_cliente):
-            nombre_cliente = datos_cliente.get("nombre", "Público General")
-            self.cliente_seleccionado = datos_cliente  # Útil después para Facturar (F10)
+            id_cli = datos_cliente.get("id")
+            cliente_completo = obtener_cliente_por_id(id_cli) if id_cli else datos_cliente
+            if not cliente_completo:
+                cliente_completo = datos_cliente
+
+            nombre_cliente = cliente_completo.get("nombre", "Público General")
+            self.cliente_seleccionado = cliente_completo
 
             self.lclientebox.configure(state="normal")
             self.lclientebox.delete(0, "end")
             self.lclientebox.insert(0, nombre_cliente)
             self.lclientebox.configure(state="disabled")
+            self.actualizar_label_puntos()
 
         BuscarCliente(self, al_seleccionar_callback=al_elegir_cliente)
+
+    def actualizar_label_puntos(self):
+        """Actualiza el indicador visual de puntos del cliente en la barra superior"""
+        if not hasattr(self, "lpuntos"):
+            return
+
+        cliente = getattr(self, "cliente_seleccionado", {"id": 1})
+        if int(cliente.get("id", 1)) == 1:
+            self.lpuntos.configure(text="Puntos: N/A (Público General)", text_color="#A1A1AA")
+            return
+
+        pts = int(cliente.get("puntos") or 0)
+        if pts >= 50:
+            self.lpuntos.configure(text=f"Puntos: {pts} pts (¡Canje disponible!)", text_color="#4ADE80")
+        else:
+            self.lpuntos.configure(text=f"Puntos: {pts} pts", text_color="#60A5FA")
+
+    def obtener_total_venta(self):
+        subtotal = sum(p["precio_total"] for p in self.lista_productos)
+        return round(subtotal * 1.16, 2)

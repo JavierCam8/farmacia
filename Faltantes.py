@@ -258,11 +258,20 @@ class FrameFaltantes(ctk.CTkFrame):
     # LÓGICA DE EVENTOS Y ACCIONES
     # ====================================================
     def busquedaprovedor(self):
-        """Abre el modal de búsqueda de proveedores (F1)"""
+        """Abre el modal de búsqueda de proveedores (F1) y bloquea la selección al elegir"""
+        if self.f1.cget("state") == "disabled":
+            return
+
         def al_elegir(prov):
+            self.blprovedorbox.configure(state="normal")
             self.blprovedorbox.delete(0, 'end')
             self.blprovedorbox.insert(0, str(prov.get('id', '')))
             self.nombre_proveedor = prov.get('nombre', '')
+
+            # Bloquear el Entry y el botón F1 hasta que se suba o cancele el pedido
+            self.blprovedorbox.configure(state="disabled")
+            self.f1.configure(state="disabled")
+            self.blcodigobox.focus()
 
         VentanaBusquedaProveedor(self, al_seleccionar_callback=al_elegir)
 
