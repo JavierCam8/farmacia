@@ -334,16 +334,6 @@ class FrameProvedor(ctk.CTkFrame):
         self.provedorfaltantebox.pack(pady=3)
         self.provedorfaltantebox.configure(state="disabled")
 
-        self.btactualizarlista = ctk.CTkButton(
-            self.pedidos,
-            text="Actualizar lista",
-            fg_color="#2563EB",
-            hover_color="#1D4ED8",
-            text_color="#FFFFFF",
-            command=self.cargar_faltantes
-        )
-        self.btactualizarlista.pack(pady=5)
-
         self.btaenviar=ctk.CTkButton(
             self.pedidos,
             text="Enviar",
